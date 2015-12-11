@@ -85,6 +85,16 @@ class DocumentationGenerator(object):
                 isinstance(method_introspector, BaseMethodIntrospector)
                 and not method_introspector.get_http_method() == "OPTIONS"]
 
+    def get_tags(self, url_path):
+        api_path = self.config.get('api_path')
+
+        if url_path.startswith(api_path):
+            path_segments = url_path[len(api_path):].split('/')
+            if path_segments:
+                return [path_segments[0]]
+
+        return []
+
     def get_operations(self, api_endpoint, introspector):
         """
         Returns docs for the allowed methods of an API endpoint
@@ -107,7 +117,7 @@ class DocumentationGenerator(object):
                 'summary': method_introspector.get_summary(),
                 'operationId': method_introspector.get_operation_id(),
                 'produces': doc_parser.get_param(param_name='produces', default=self.config.get('produces')),
-                'tags': doc_parser.get_param(param_name='tags', default=[]),
+                'tags': doc_parser.get_param(param_name='tags', default=self.get_tags(api_endpoint['path'])),
                 'parameters': self._get_operation_parameters(method_introspector, operation_method)
             }
 
