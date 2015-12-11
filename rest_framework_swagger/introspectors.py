@@ -206,15 +206,14 @@ class BaseMethodIntrospector(object):
             self.get_docs() or self.parent.get_description())
 
     def get_operation_id(self):
-        """ Returns the APIView's operationId """
+        """
+        Returns the APIView's operationId. Defaults to generating an ID based on
+        the method and path.
+        """
         parser = self.get_yaml_parser()
         operation_id = parser.object.get('operationId', None)
         if not operation_id:
-            logger.error("No operationId defined for path {} on method {}".format(
-                parser.method_introspector.path,
-                parser.method_introspector.method
-            ))
-            return None
+            operation_id = self.method + "-" + self.path.strip("/").replace("/", "-")
 
         return operation_id
 
