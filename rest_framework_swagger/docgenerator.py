@@ -44,11 +44,14 @@ class DocumentationGenerator(object):
         return {
             'swagger': '2.0',
             'info': self.config.get('info', {
-                'contact': '',
+                'contact': {},
+                'title': 'Our API',
+                'version': self.request.version,
+                'description': '',
             }),
             'basePath': self.config.get("api_path", ''),
-            'host': self.config.get('host', ''),
-            'schemes': self.config.get('schemes', ''),
+            'host': self.config.get('host', self.request.get_host()),
+            'schemes': self.config.get('schemes', ["https" if self.request.is_secure() else "http"]),
             'paths': self.get_paths(endpoints_conf),
             'definitions': self.get_definitions(endpoints_conf),
             'securityDefinitions': self.config.get('securityDefinitions', {})
