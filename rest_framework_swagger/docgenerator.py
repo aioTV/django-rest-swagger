@@ -46,9 +46,7 @@ class DocumentationGenerator(object):
             'info': self.config.get('info', {
                 'contact': '',
             }),
-            'basePath': self.config.get("basePath", '').format(
-                version=self.request.parser_context['kwargs']['version']
-            ),
+            'basePath': self.config.get("api_path", ''),
             'host': self.config.get('host', ''),
             'schemes': self.config.get('schemes', ''),
             'paths': self.get_paths(endpoints_conf),
@@ -60,7 +58,7 @@ class DocumentationGenerator(object):
         paths_dict = {}
         for endpoint in endpoints_conf:
             # remove the base_path from the begining of the path
-            endpoint['path'] = extract_base_path(path=endpoint['path'], base_path=self.config.get('basePath'))
+            endpoint['path'] = extract_base_path(path=endpoint['path'], base_path=self.config.get('base_path'))
             paths_dict[endpoint['path']] = self.get_path_item(endpoint)
         paths_dict = OrderedDict(sorted(paths_dict.items()))
         return paths_dict
