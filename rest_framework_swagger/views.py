@@ -34,7 +34,7 @@ class BaseSwaggerView(object):
 
 
 class SwaggerUIView(BaseSwaggerView, View):
-    def get(self, request, version, swagger_config_name=None):
+    def get(self, request, version=None, swagger_config_name=None):
         self.check_permission(request, swagger_config_name)
         auth_token = getattr(request.user, 'auth_token', None)
         data = {
@@ -61,7 +61,7 @@ class Swagger2JSONView(BaseSwaggerView, APIView):
     permission_classes = (AllowAny,)
     renderer_classes = (JSONRenderer, )
 
-    def get(self, request, version, swagger_config_name=None):
+    def get(self, request, version=None, swagger_config_name=None):
         self.check_permission(request, swagger_config_name)
         paths = self.get_paths()
         generator = DocumentationGenerator(
