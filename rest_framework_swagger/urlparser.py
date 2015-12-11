@@ -3,12 +3,12 @@ from django.core.urlresolvers import RegexURLResolver, RegexURLPattern
 from django.contrib.admindocs.views import simplify_regex
 
 from rest_framework.views import APIView
-
+from django.conf import settings
 
 class UrlParser(object):
 
     def __init__(self, config, request):
-        self.urlconf = getattr(request, "urlconf", None)
+        self.urlconf = getattr(request, "urlconf", settings.ROOT_URLCONF)
         self.exclude_namespaces = config.get('exclude_namespaces', [])
         self.exclude_module_paths = config.get('exclude_module_paths', [])
         self.include_module_paths = config.get('include_module_paths', [])
