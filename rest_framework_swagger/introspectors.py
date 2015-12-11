@@ -217,6 +217,16 @@ class BaseMethodIntrospector(object):
 
         return operation_id
 
+    def get_consumes(self):
+        if not hasattr(self.callback, 'get_parsers'):
+            return []
+        return {r.media_type for r in self.callback().get_parsers()}
+
+    def get_produces(self):
+        if not hasattr(self.callback, 'get_renderers'):
+            return []
+        return {r.media_type for r in self.callback().get_renderers()}
+
     def get_description(self, use_markdown=False):
         """
         Returns the body of the docstring trimmed before any parameters are

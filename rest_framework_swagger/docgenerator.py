@@ -112,12 +112,19 @@ class DocumentationGenerator(object):
 
             operation_method = method_introspector.get_http_method()
 
+            produces = method_introspector.get_produces()
+            produces = doc_parser.get_param(param_name='produces', default=produces or self.config.get('produces'))
+
+            consumes = method_introspector.get_consumes()
+            consumes = doc_parser.get_param(param_name='consumes', default=consumes or self.config.get('consumes'))
+
             operation = {
                 'method': operation_method,
                 'description': method_introspector.get_description(),
                 'summary': method_introspector.get_summary(),
                 'operationId': method_introspector.get_operation_id(),
-                'produces': doc_parser.get_param(param_name='produces', default=self.config.get('produces')),
+                'produces': produces,
+                'consumes': consumes,
                 'tags': doc_parser.get_param(param_name='tags', default=self.get_tags(api_endpoint['path'])),
                 'parameters': self._get_operation_parameters(method_introspector, operation_method)
             }
