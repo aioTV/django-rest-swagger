@@ -395,13 +395,14 @@ class DocumentationGenerator(object):
             if not description or description.strip() == '':
                 description = ""
             f = {
-                'description': description,
                 'type': data_type,
                 'format': data_format,
                 # 'required': getattr(field, 'required', False),
                 'defaultValue': get_default_value(field),
                 'readOnly': getattr(field, 'read_only', None),
             }
+            if description:
+                f['description'] = description
 
             # Swagger type is a primitive, format is more specific
             if f['type'] == f['format']:

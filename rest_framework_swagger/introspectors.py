@@ -378,14 +378,14 @@ class BaseMethodIntrospector(object):
                 parameter = {
                     'in': 'query',
                     'name': name,
-                    'description': filter_.label,
                 }
+                if filter_.label:
+                    parameter['description'] = filter_.label
                 normalize_data_format(data_type, None, parameter)
                 multiple_choices = filter_.extra.get('choices', {})
                 if multiple_choices:
                     parameter['enum'] = [choice[0] for choice
                                          in itertools.chain(multiple_choices)]
-                    # parameter['type'] = 'enum'
                 params.append(parameter)
 
         return params
