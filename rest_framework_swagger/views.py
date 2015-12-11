@@ -36,10 +36,11 @@ class BaseSwaggerView(object):
 class SwaggerUIView(BaseSwaggerView, View):
     def get(self, request, version, swagger_config_name=None):
         self.check_permission(request, swagger_config_name)
+        auth_token = getattr(request.user, 'auth_token', None)
         data = {
             'swagger_settings': {
                 'swagger_file': "%s/swagger.json" % self.get_full_base_path(request),
-                'user_token': request.user.auth_token.key
+                'user_token': auth_token.key if auth_token else '',
             }
         }
         response = render_to_response(
