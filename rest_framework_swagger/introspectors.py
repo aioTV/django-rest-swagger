@@ -414,8 +414,12 @@ class BaseMethodIntrospector(object):
                     'in': 'query',
                     'name': name,
                 }
+                help_text = getattr(filter_.field, 'help_text', None)
                 if filter_.label:
                     parameter['description'] = filter_.label
+                elif help_text:
+                    parameter['description'] = help_text
+
                 normalize_data_format(data_type, None, parameter)
                 multiple_choices = filter_.extra.get('choices', {})
                 if multiple_choices:
