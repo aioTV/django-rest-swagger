@@ -263,12 +263,10 @@ class BaseMethodIntrospector(object):
         the DRF serializer fields
         """
         params = []
-        # path_params = self.build_path_parameters()
         query_params = self.build_query_parameters()
         pagination_params = self.build_pagination_parameters()
         if django_filters is not None:
-            query_params.extend(
-                self.build_query_parameters_from_django_filters())
+            query_params.extend(self.build_query_parameters_from_django_filters())
 
         if query_params:
             params += query_params
@@ -402,6 +400,11 @@ class BaseMethodIntrospector(object):
         introspect ``django_filters.FilterSet`` instances.
         """
         params = []
+
+        # Default to showing filter params only for 'list' operation, but allow overriding this
+        if self.method not in self.get_yaml_parser().get_param('filter_methods', ['list']):
+            return params
+
         filter_class = getattr(self.callback, 'filter_class', None)
         if (filter_class is not None and
                 issubclass(filter_class, django_filters.FilterSet)):
