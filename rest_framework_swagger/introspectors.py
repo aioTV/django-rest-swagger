@@ -310,6 +310,27 @@ class BaseMethodIntrospector(object):
             }
         }
 
+    def get_form_parameters(self):
+        serializer = self.get_request_serializer_class()
+
+        fields = []
+        for field in extract_serializer_fields(serializer):
+            if field['read_only']:
+                continue
+            if field['type'] not in {"string", "number", "integer", "boolean", "array"}:
+                continue
+            parameter = {
+                'in': 'formData',
+                'name': field['name'],
+            }
+            normalize_data_format(field['type'], field['format'], parameter)
+            for key in ['description', 'required', 'enum']:
+                if field[key]:
+                    parameter[key] = field[key]
+            fields.append(parameter)
+
+        return fields
+
     def build_path_parameters(self):
         """
         Gets the parameters from the URL

@@ -126,7 +126,7 @@ class DocumentationGenerator(object):
                 'produces': produces,
                 'consumes': consumes,
                 'tags': doc_parser.get_param(param_name='tags', default=self.get_tags(api_endpoint['path'])),
-                'parameters': self._get_operation_parameters(method_introspector, operation_method)
+                'parameters': self._get_operation_parameters(method_introspector, operation_method, consumes)
             }
 
             if doc_parser.yaml_error is not None:
@@ -160,7 +160,7 @@ class DocumentationGenerator(object):
 
         return operations
 
-    def _get_operation_parameters(self, introspector, method):
+    def _get_operation_parameters(self, introspector, method, consumes):
         """
         :param introspector: method introspector
         :return : if the serializer must be placed in the body, it will build
@@ -169,10 +169,12 @@ class DocumentationGenerator(object):
         """
         serializer = introspector.get_request_serializer_class()
         parameters = []
-        if (method in ('POST', 'PUT', 'PATCH') and hasattr(serializer, "Meta")
-           and hasattr(serializer.Meta, "_in") and serializer.Meta._in == "body"):
-            self.explicit_serializers.add(serializer)
-            parameters.append(introspector.build_body_parameters())
+        if method in ('POST', 'PUT', 'PATCH') and serializer:
+            if set(consumes).issubset({"multipart/form-data", "application/x-www-form-encoded"}):
+                parameters.extend(introspector.get_form_parameters())
+            elif getattr(getattr(serializer, "Meta", None), "_in", "body") == "body":
+                self.explicit_serializers.add(serializer)
+                parameters.append(introspector.build_body_parameters())
 
         parameters.extend(
             introspector.get_yaml_parser().discover_parameters(inspector=introspector)
