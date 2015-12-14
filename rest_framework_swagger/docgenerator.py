@@ -45,11 +45,11 @@ class DocumentationGenerator(object):
             'swagger': '2.0',
             'info': self.config.get('info', {
                 'contact': {},
-                'title': 'Our API',
+                'title': 'API Documentation',
                 'version': self.request.version,
                 'description': '',
             }),
-            'basePath': self.config.get("api_path", ''),
+            'basePath': self.config.get("base_path", ''),
             'host': self.config.get('host', self.request.get_host()),
             'schemes': self.config.get('schemes', ["https" if self.request.is_secure() else "http"]),
             'paths': self.get_paths(endpoints_conf),
@@ -87,12 +87,9 @@ class DocumentationGenerator(object):
                 and not method_introspector.get_http_method() == "OPTIONS"]
 
     def get_tags(self, url_path):
-        api_path = self.config.get('api_path')
-
-        if url_path.startswith(api_path):
-            path_segments = url_path[len(api_path):].split('/')
-            if path_segments:
-                return [path_segments[0]]
+        leading_segment = url_path.split('/')[0]
+        if leading_segment:
+            return [leading_segment]
 
         return []
 

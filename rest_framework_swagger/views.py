@@ -39,7 +39,7 @@ class SwaggerUIView(BaseSwaggerView, View):
         auth_token = getattr(request.user, 'auth_token', None)
         data = {
             'swagger_settings': {
-                'swagger_file': "%s/swagger.json" % self.get_full_base_path(request),
+                'swagger_file': self.get_json_url(request),
                 'user_token': auth_token.key if auth_token else '',
             }
         }
@@ -48,13 +48,11 @@ class SwaggerUIView(BaseSwaggerView, View):
 
         return response
 
-    def get_full_base_path(self, request):
-        base_path = self.config.get('base_path', None)
-        if not base_path:
-            return request.build_absolute_uri(request.path).rstrip('/')
-        else:
-            protocol = 'https' if request.is_secure() else 'http'
-            return '{0}://{1}'.format(protocol, base_path.rstrip('/'))
+    def get_json_url(self, request):
+        json_path = self.config.get("json_path", None)
+        if not json_path:
+            json_path = self.config.get('base_path', request.path).rstrip("/") + "/swagger.json"
+        return request.build_absolute_uri(json_path)
 
 
 class Swagger2JSONView(BaseSwaggerView, APIView):
