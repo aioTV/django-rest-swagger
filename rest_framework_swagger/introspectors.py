@@ -18,6 +18,7 @@ from django.contrib.admindocs.utils import trim_docstring
 from django.utils.encoding import smart_text
 
 import rest_framework
+import rest_framework.filters
 from rest_framework import viewsets
 from rest_framework.utils import formatting
 from rest_framework.mixins import ListModelMixin
@@ -404,10 +405,23 @@ class BaseMethodIntrospector(object):
         # Default to showing filter params only for 'list' operation, but allow overriding this
         if self.method not in self.get_yaml_parser().get_param('filter_methods', ['list']):
             return params
+        if not hasattr(self.callback, "filter_backends"):
+            return params
 
-        filter_class = getattr(self.callback, 'filter_class', None)
-        if (filter_class is not None and
-                issubclass(filter_class, django_filters.FilterSet)):
+        serializer = self.get_serializer_class()
+        qs = serializer.Meta.model.objects.none() if serializer else None
+
+        for filter_backend in self.callback.filter_backends:
+            if not issubclass(filter_backend, rest_framework.filters.DjangoFilterBackend):
+                continue
+
+            filter_class = default_filter_class = filter_backend.default_filter_set
+            if qs is not None:
+                filter_class = filter_backend().get_filter_class(self.callback, qs) or default_filter_class
+
+            if not filter_class or filter_class == rest_framework.filters.DjangoFilterBackend.default_filter_set:
+                continue
+
             for name, filter_ in filter_class.base_filters.items():
                 data_type = 'string'
                 parameter = {
