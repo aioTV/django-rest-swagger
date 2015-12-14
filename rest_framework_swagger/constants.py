@@ -8,6 +8,6 @@ INTROSPECTOR_ENUMS = [
 INTROSPECTOR_PRIMITIVES = {
     'integer': ['int32', 'int64'],
     'number': ['float', 'double'],
-    'string': ['string', 'byte', 'date', 'date-time'],
+    'string': ['string', 'byte', 'date', 'date-time', 'password'],
     'boolean': ['boolean'],
 }

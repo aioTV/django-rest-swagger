@@ -468,6 +468,8 @@ def get_data_type(field):
         # return 'string', 'string' # 'file upload'
     # elif isinstance(field, fields.CharField):
         # return 'string', 'string'
+    elif getattr(field, 'style', {}).get('input_type') == 'password':
+        return 'string', 'password'
 
     elif rest_framework.VERSION >= '3.0.0' and isinstance(field, fields.HiddenField):
         return 'hidden', 'hidden'
