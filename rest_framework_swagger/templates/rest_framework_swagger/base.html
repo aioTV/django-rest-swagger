@@ -121,8 +121,10 @@
 
               // if you have an apiKey you would like to pre-populate on the page for demonstration purposes...
               var apiKey = "{{ swagger_settings.user_token }}";
-              $('#input_apiKey').val(apiKey);
-
+              if (apiKey) {
+                $('#input_apiKey').val(apiKey);
+                $('#input_apiKey').change();
+              }
 
               window.swaggerUi.load();
 
