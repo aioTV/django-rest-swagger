@@ -10,7 +10,7 @@ from .compat import strip_tags, get_pagination_attribures
 from .yamlparser import YAMLDocstringParser
 from .constants import INTROSPECTOR_ENUMS, INTROSPECTOR_PRIMITIVES
 from .utils import (normalize_data_format, get_view_description,
-                    do_markdown, get_serializer_name)
+                    do_markdown, get_serializer_name, get_default_value)
 from abc import ABCMeta, abstractmethod
 
 from django.http import HttpRequest
@@ -668,3 +668,97 @@ class ViewSetMethodIntrospector(BaseMethodIntrospector):
                 })
                 normalize_data_format(data_type, None, parameters[-1])
         return parameters
+
+
+def extract_serializer_fields(serializer):
+    if serializer is None:
+        return []
+
+    if hasattr(serializer, '__call__'):
+        fields = serializer().get_fields()
+    else:
+        fields = serializer.get_fields()
+
+    serializer_data = []
+    for name, field in fields.items():
+        data_type, data_format = get_data_type(field) or ('string', 'string')
+
+        if data_type == 'hidden':
+            continue
+
+        field_data = {
+            'minimum': None,
+            'maximum': None,
+            'enum': None,
+            'items': None,
+            '$ref': None,
+            'name': name,
+            'type': data_type,
+            'format': data_format,
+            'write_only': getattr(field, 'write_only', False),
+            'read_only': getattr(field, 'read_only', False),
+            'required': getattr(field, 'required', False),
+            'default': get_default_value(field),
+        }
+
+        help_text = getattr(field, 'help_text', '')
+        field_data['description'] = help_text.strip() if help_text else ''
+
+        # guess format
+        # data_format = 'string'
+        # if data_type in BaseMethodIntrospector.PRIMITIVES:
+        # data_format = BaseMethodIntrospector.PRIMITIVES.get(data_type)[0]
+
+
+        # Min/Max values
+        max_value = getattr(field, 'max_value', None)
+        min_value = getattr(field, 'min_value', None)
+
+        if data_type == 'integer':
+            field_data['minimum'] = min_value
+            field_data['maximum'] = max_value
+
+        # ENUM options
+        if data_type in BaseMethodIntrospector.ENUMS:
+            if isinstance(field.choices, list):
+                field_data['enum'] = [k for k, v in field.choices]
+            elif isinstance(field.choices, dict):
+                field_data['enum'] = [k for k, v in field.choices.items()]
+
+        # Support for complex types
+        if rest_framework.VERSION < '3.0.0':
+            has_many = hasattr(field, 'many') and field.many
+        else:
+            from rest_framework.serializers import ListSerializer, ManyRelatedField
+            has_many = isinstance(field, (ListSerializer, ManyRelatedField))
+
+        if isinstance(field, rest_framework.serializers.BaseSerializer) or has_many:
+            if hasattr(field, 'is_documented') and not field.is_documented:
+                field_data['type'] = 'object'
+            elif isinstance(field, rest_framework.serializers.BaseSerializer):
+                field_serializer = get_serializer_name(field)
+
+                if getattr(field, 'write_only', False):
+                    field_serializer = "Write{}".format(field_serializer)
+
+                if not has_many:
+                    #del field_data['type']
+                    field_data['$ref'] = '#/definitions/' + field_serializer
+            else:
+                field_serializer = None
+                data_type = 'string'
+
+            if has_many:
+                field_data['type'] = 'array'
+                if field_serializer:
+                    field_data['items'] = {'$ref': '#/definitions/' + field_serializer}
+                elif data_type in BaseMethodIntrospector.PRIMITIVES:
+                    field_data['items'] = {'type': data_type}
+        elif isinstance(field, rest_framework.serializers.ListField):
+            field_data['type'] = 'array'
+            if not field.child:
+                field_data['items'] = {'type': 'string'}
+            child_type, child_format = get_data_type(field.child) or ('string', 'string')
+            field_data['items'] = {'type': child_type}
+        serializer_data.append(field_data)
+    return serializer_data
