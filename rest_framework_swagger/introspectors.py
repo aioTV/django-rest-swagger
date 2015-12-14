@@ -423,18 +423,19 @@ class BaseMethodIntrospector(object):
                 continue
 
             for name, filter_ in filter_class.base_filters.items():
-                data_type = 'string'
+                data_type, data_format = get_filter_data_type(filter_)
                 parameter = {
                     'in': 'query',
                     'name': name,
                 }
+
                 help_text = getattr(filter_.field, 'help_text', None)
                 if filter_.label:
                     parameter['description'] = filter_.label
                 elif help_text:
                     parameter['description'] = help_text
 
-                normalize_data_format(data_type, None, parameter)
+                normalize_data_format(data_type, data_format, parameter)
                 multiple_choices = filter_.extra.get('choices', {})
                 if multiple_choices:
                     parameter['enum'] = [choice[0] for choice
@@ -497,6 +498,21 @@ def get_data_type(field):
         return 'hidden', 'hidden'
     else:
         return 'string', 'string'
+
+
+def get_filter_data_type(filter_):
+    from django.forms import fields
+    mapping = {
+        fields.BooleanField: ('boolean', 'boolean'),
+        fields.DateField: ('string', 'date'),
+        fields.DateTimeField: ('string', 'date-time'),
+        fields.IntegerField: ('integer', 'int64'),
+        fields.FloatField: ('integer', 'float'),
+    }
+    for clazz, value in mapping.items():
+        if isinstance(filter_.field, clazz):
+            return value
+    return 'string', 'string'
 
 
 class APIViewIntrospector(BaseViewIntrospector):
