@@ -104,6 +104,9 @@ class DocumentationGenerator(object):
         for method_introspector in self.get_method_introspectors(api_endpoint, introspector):
             doc_parser = method_introspector.get_yaml_parser()
 
+            if doc_parser.should_omit_endpoint():
+                continue
+
             serializer = self._get_method_serializer(method_introspector)
 
             response_type = self._get_method_response_type(

@@ -431,6 +431,12 @@ class YAMLDocstringParser(object):
         """
         return self.object.get('omit_serializer', False)
 
+    def should_omit_endpoint(self):
+        """
+        Checks if the endpoint should be completely omitted
+        """
+        return self.object.get('omit_endpoint', False)
+
     def _apply_strategy(self, param_type, method_params, docstring_params):
         """
         Applies strategy for subset of parameters filtered by `in`
