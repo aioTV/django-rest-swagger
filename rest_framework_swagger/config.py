@@ -10,7 +10,8 @@ class SwaggerConfig(object):
         'include_module_paths': [],
         'is_authenticated': False,
         'is_superuser': False,
-        'base_path': ''
+        'base_path': '',
+        'tag_matchers': ['rest_framework_swagger.utils.tag_from_prefix'],
     }
 
     def __init__(self):

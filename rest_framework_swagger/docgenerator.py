@@ -1,5 +1,6 @@
 """Generates API documentation by introspection."""
 from django.contrib.auth.models import AnonymousUser
+from django.utils.module_loading import import_string
 import rest_framework
 
 from rest_framework import viewsets, mixins
@@ -33,6 +34,7 @@ class DocumentationGenerator(object):
         self.config = config
         self.user = for_user or AnonymousUser()
         self.request = request
+        self._tag_matchers = map(import_string, self.config.get('tag_matchers'))
 
     def get_root(self, endpoints_conf):
         self.default_payload_definition_name = self.config.get("default_payload_definition_name", None)
@@ -54,7 +56,8 @@ class DocumentationGenerator(object):
             'schemes': self.config.get('schemes', ["https" if self.request.is_secure() else "http"]),
             'paths': self.get_paths(endpoints_conf),
             'definitions': self.get_definitions(endpoints_conf),
-            'securityDefinitions': self.config.get('securityDefinitions', {})
+            'securityDefinitions': self.config.get('securityDefinitions', {}),
+            'tags': self.config.get('tags', []),
         }
 
     def get_paths(self, endpoints_conf):
@@ -87,11 +90,10 @@ class DocumentationGenerator(object):
                 and not method_introspector.get_http_method() == "OPTIONS"]
 
     def get_tags(self, url_path):
-        leading_segment = url_path.split('/')[0]
-        if leading_segment:
-            return [leading_segment]
-
-        return []
+        tags = []
+        for matcher in self._tag_matchers:
+            tags.extend(matcher(url_path))
+        return tags
 
     def get_operations(self, api_endpoint, introspector):
         """
