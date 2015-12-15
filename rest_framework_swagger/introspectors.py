@@ -409,38 +409,16 @@ class BaseMethodIntrospector(object):
             return params
 
         serializer = self.get_serializer_class()
-        qs = serializer.Meta.model.objects.none() if serializer else None
+        model = serializer.Meta.model if serializer else None
 
         for filter_backend in self.callback.filter_backends:
             if not issubclass(filter_backend, rest_framework.filters.DjangoFilterBackend):
                 continue
+            filter_introspector = DjangoFilterIntrospector(filter_backend, self, model)
+            parser = self.get_yaml_parser()
 
-            filter_class = default_filter_class = filter_backend.default_filter_set
-            if qs is not None:
-                filter_class = filter_backend().get_filter_class(self.callback, qs) or default_filter_class
-
-            if not filter_class or filter_class == rest_framework.filters.DjangoFilterBackend.default_filter_set:
-                continue
-
-            for name, filter_ in filter_class.base_filters.items():
-                data_type, data_format = get_filter_data_type(filter_)
-                parameter = {
-                    'in': 'query',
-                    'name': name,
-                }
-
-                help_text = getattr(filter_.field, 'help_text', None)
-                if filter_.label:
-                    parameter['description'] = filter_.label
-                elif help_text:
-                    parameter['description'] = help_text
-
-                normalize_data_format(data_type, data_format, parameter)
-                multiple_choices = filter_.extra.get('choices', {})
-                if multiple_choices:
-                    parameter['enum'] = [choice[0] for choice
-                                         in itertools.chain(multiple_choices)]
-                params.append(parameter)
+            parser.object = parser.load_obj_from_docstring(filter_introspector.get_yaml()) or {}
+            params.extend(parser.discover_parameters(filter_introspector))
 
         return params
 
@@ -823,3 +801,54 @@ def extract_serializer_fields(serializer):
             field_data['items'] = {'type': child_type}
         serializer_data.append(field_data)
     return serializer_data
+
+
+class DjangoFilterIntrospector(object):
+    def __init__(self, filter_backend, parent, model):
+        self.method = parent.method
+        self.parent = parent
+        self.callback = parent.callback
+        self.path = parent.path
+        self.user = parent.user
+
+        self.filter_backend = filter_backend
+        qs = model.objects.none() if model else None
+        self.filter_class = default_filter_class = self.filter_backend.default_filter_set
+        if qs is not None:
+            self.filter_class = filter_backend().get_filter_class(self.callback, qs) or default_filter_class
+
+    def get_yaml(self):
+        meta_spec =  getattr(getattr(self.filter_class, 'Meta', None), 'swagger_spec', '')
+        doc_string = getattr(self.filter_class, '__doc__', '')
+        return meta_spec or doc_string
+
+    def get_http_method(self):
+        return self.parent.get_http_method()
+
+    def get_parameters(self):
+        if not self.filter_class or self.filter_class == rest_framework.filters.DjangoFilterBackend.default_filter_set:
+            return []
+
+        params = []
+        for name, filter_ in self.filter_class.base_filters.items():
+            if name in getattr(getattr(self.filter_class, 'Meta', {}), 'swagger_exclude', []):
+                continue
+
+            data_type, data_format = get_filter_data_type(filter_)
+            parameter = {
+                'in': 'query',
+                'name': name,
+            }
+
+            description = filter_.label or getattr(filter_.field, 'help_text', None)
+            if description:
+                parameter['description'] = description
+
+            normalize_data_format(data_type, data_format, parameter)
+            multiple_choices = filter_.extra.get('choices', {})
+            if multiple_choices:
+                parameter['enum'] = [choice[0] for choice
+                                     in itertools.chain(multiple_choices)]
+            params.append(parameter)
+
+        return params
