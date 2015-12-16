@@ -103,7 +103,26 @@
                   log("Unable to Load SwaggerUI");
                 },
                 docExpansion: "none",
-                apisSorter: "alpha",
+                apisSorter: function (a, b) {
+                    // Sort tags using the order specified in the tags list
+                    if (typeof window.swaggerUi.api.swaggerObject.tags === 'undefined') {
+                        return a.name.localeCompare(b.name);
+                    }
+                    var ordered_tag_list = window.swaggerUi.api.swaggerObject.tags.map(function(x) {
+                        return x.name
+                    });
+                    var index_a = ordered_tag_list.indexOf(a.name);
+                    var index_b = ordered_tag_list.indexOf(b.name);
+
+                    if (index_a < 0 && index_b < 0) {
+                        return a.name.localeCompare(b.name);
+                    } else if (index_a < 0) {
+                        return 1;
+                    } else if (index_b < 0) {
+                        return -1;
+                    }
+                    return index_a - index_b;
+                },
                 showRequestHeaders: false
               });
 
