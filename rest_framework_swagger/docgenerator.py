@@ -1,11 +1,12 @@
 """Generates API documentation by introspection."""
 from django.contrib.auth.models import AnonymousUser
+from django.utils.module_loading import import_string
 import rest_framework
 
 from rest_framework import viewsets, mixins
 from rest_framework.generics import GenericAPIView
 
-from rest_framework.serializers import BaseSerializer, ListField
+from rest_framework.serializers import BaseSerializer
 
 from .introspectors import (
     APIViewIntrospector,
@@ -13,10 +14,10 @@ from .introspectors import (
     BaseMethodIntrospector,
     ViewSetIntrospector,
     WrappedAPIViewIntrospector,
-    get_data_type,
+    extract_serializer_fields,
 )
 from .compat import OrderedDict
-from .utils import extract_base_path, get_serializer_name, get_default_value
+from .utils import extract_base_path, get_serializer_name
 
 
 class DocumentationGenerator(object):
@@ -33,6 +34,7 @@ class DocumentationGenerator(object):
         self.config = config
         self.user = for_user or AnonymousUser()
         self.request = request
+        self._tag_matchers = map(import_string, self.config.get('tag_matchers'))
 
     def get_root(self, endpoints_conf):
         self.default_payload_definition_name = self.config.get("default_payload_definition_name", None)
@@ -41,18 +43,22 @@ class DocumentationGenerator(object):
             self.explicit_response_types.update({
                 self.default_payload_definition_name: self.default_payload_definition
             })
-        return {
-            'swagger': '2.0',
-            'info': self.config.get('info', {
-                'contact': '',
-            }),
-            'basePath': self.config.get("api_path", ''),
-            'host': self.config.get('host', ''),
-            'schemes': self.config.get('schemes', ''),
-            'paths': self.get_paths(endpoints_conf),
-            'definitions': self.get_definitions(endpoints_conf),
-            'securityDefinitions': self.config.get('securityDefinitions', {})
-        }
+        return OrderedDict([
+            ('swagger', '2.0'),
+            ('info', self.config.get('info', {
+                'contact': {},
+                'title': 'API Documentation',
+                'version': self.request.version,
+                'description': '',
+            })),
+            ('basePath', self.config.get("base_path", '')),
+            ('host', self.config.get('host', self.request.get_host())),
+            ('schemes', self.config.get('schemes', ["https" if self.request.is_secure() else "http"])),
+            ('securityDefinitions', self.config.get('securityDefinitions', {})),
+            ('tags', self.config.get('tags', [])),
+            ('paths', self.get_paths(endpoints_conf)),
+            ('definitions', self.get_definitions(endpoints_conf)),
+        ])
 
     def get_paths(self, endpoints_conf):
         paths_dict = {}
@@ -84,14 +90,10 @@ class DocumentationGenerator(object):
                 and not method_introspector.get_http_method() == "OPTIONS"]
 
     def get_tags(self, url_path):
-        api_path = self.config.get('api_path')
-
-        if url_path.startswith(api_path):
-            path_segments = url_path[len(api_path):].split('/')
-            if path_segments:
-                return [path_segments[0]]
-
-        return []
+        tags = []
+        for matcher in self._tag_matchers:
+            tags.extend(matcher(url_path))
+        return tags
 
     def get_operations(self, api_endpoint, introspector):
         """
@@ -102,6 +104,9 @@ class DocumentationGenerator(object):
         for method_introspector in self.get_method_introspectors(api_endpoint, introspector):
             doc_parser = method_introspector.get_yaml_parser()
 
+            if doc_parser.should_omit_endpoint():
+                continue
+
             serializer = self._get_method_serializer(method_introspector)
 
             response_type = self._get_method_response_type(
@@ -109,14 +114,21 @@ class DocumentationGenerator(object):
 
             operation_method = method_introspector.get_http_method()
 
+            produces = method_introspector.get_produces()
+            produces = doc_parser.get_param(param_name='produces', default=produces or self.config.get('produces'))
+
+            consumes = method_introspector.get_consumes()
+            consumes = doc_parser.get_param(param_name='consumes', default=consumes or self.config.get('consumes'))
+
             operation = {
                 'method': operation_method,
                 'description': method_introspector.get_description(),
                 'summary': method_introspector.get_summary(),
                 'operationId': method_introspector.get_operation_id(),
-                'produces': doc_parser.get_param(param_name='produces', default=self.config.get('produces')),
+                'produces': produces,
+                'consumes': consumes,
                 'tags': doc_parser.get_param(param_name='tags', default=self.get_tags(api_endpoint['path'])),
-                'parameters': self._get_operation_parameters(method_introspector, operation_method)
+                'parameters': self._get_operation_parameters(method_introspector, operation_method, consumes)
             }
 
             if doc_parser.yaml_error is not None:
@@ -150,7 +162,7 @@ class DocumentationGenerator(object):
 
         return operations
 
-    def _get_operation_parameters(self, introspector, method):
+    def _get_operation_parameters(self, introspector, method, consumes):
         """
         :param introspector: method introspector
         :return : if the serializer must be placed in the body, it will build
@@ -159,10 +171,12 @@ class DocumentationGenerator(object):
         """
         serializer = introspector.get_request_serializer_class()
         parameters = []
-        if (method in ('POST', 'PUT', 'PATCH') and hasattr(serializer, "Meta")
-           and hasattr(serializer.Meta, "_in") and serializer.Meta._in == "body"):
-            self.explicit_serializers.add(serializer)
-            parameters.append(introspector.build_body_parameters())
+        if method in ('POST', 'PUT', 'PATCH') and serializer:
+            if set(consumes).issubset({"multipart/form-data", "application/x-www-form-encoded"}):
+                parameters.extend(introspector.get_form_parameters())
+            elif getattr(getattr(serializer, "Meta", None), "_in", "body") == "body":
+                self.explicit_serializers.add(serializer)
+                parameters.append(introspector.build_body_parameters())
 
         parameters.extend(
             introspector.get_yaml_parser().discover_parameters(inspector=introspector)
@@ -360,109 +374,39 @@ class DocumentationGenerator(object):
         if serializer is None:
             return
 
-        if hasattr(serializer, '__call__'):
-            fields = serializer().get_fields()
-        else:
-            fields = serializer.get_fields()
-
         data = OrderedDict({
             'fields': OrderedDict(),
             'required': [],
             'write_only': [],
             'read_only': [],
         })
-        for name, field in fields.items():
-            if getattr(field, 'write_only', False):
+        for field_data in extract_serializer_fields(serializer):
+            name = field_data['name']
+            if field_data['write_only']:
                 data['write_only'].append(name)
-
-            if getattr(field, 'read_only', False):
+            if field_data['read_only']:
                 data['read_only'].append(name)
-
-            if getattr(field, 'required', False):
+            if field_data['required']:
                 data['required'].append(name)
 
-            data_type, data_format = get_data_type(field) or ('string', 'string')
-
-            if data_type == 'hidden':
-                continue
-
-            # guess format
-            # data_format = 'string'
-            # if data_type in BaseMethodIntrospector.PRIMITIVES:
-                # data_format = BaseMethodIntrospector.PRIMITIVES.get(data_type)[0]
-
-            description = getattr(field, 'help_text', '')
-            if not description or description.strip() == '':
-                description = ""
-            f = {
-                'description': description,
-                'type': data_type,
-                'format': data_format,
-                # 'required': getattr(field, 'required', False),
-                'defaultValue': get_default_value(field),
-                'readOnly': getattr(field, 'read_only', None),
+            f = {}
+            data_mapping = {
+                'readOnly': 'read_only',
+                'type': 'type',
+                'format': 'format',
+                'description': 'description',
+                'defaultValue': 'default',
+                'minimum': 'minimum',
+                'maximum': 'maximum',
+                'enum': 'enum',
+                '$ref': '$ref',
+                'items': 'items',
             }
-
-            # Swagger type is a primitive, format is more specific
-            if f['type'] == f['format']:
-                del f['format']
-
-            # defaultValue of null is not allowed, it is specific to type
-            if f['defaultValue'] is None:
-                del f['defaultValue']
-
-            # Min/Max values
-            max_value = getattr(field, 'max_value', None)
-            min_value = getattr(field, 'min_value', None)
-            if max_value is not None and data_type == 'integer':
-                f['minimum'] = min_value
-
-            if max_value is not None and data_type == 'integer':
-                f['maximum'] = max_value
-
-            # ENUM options
-            if data_type in BaseMethodIntrospector.ENUMS:
-                if isinstance(field.choices, list):
-                    f['enum'] = [k for k, v in field.choices]
-                elif isinstance(field.choices, dict):
-                    f['enum'] = [k for k, v in field.choices.items()]
-
-            # Support for complex types
-            if rest_framework.VERSION < '3.0.0':
-                has_many = hasattr(field, 'many') and field.many
-            else:
-                from rest_framework.serializers import ListSerializer, ManyRelatedField
-                has_many = isinstance(field, (ListSerializer, ManyRelatedField))
-
-            if isinstance(field, BaseSerializer) or has_many:
-                if hasattr(field, 'is_documented') and not field.is_documented:
-                    f['type'] = 'object'
-                elif isinstance(field, BaseSerializer):
-                    field_serializer = get_serializer_name(field)
-
-                    if getattr(field, 'write_only', False):
-                        field_serializer = "Write{}".format(field_serializer)
-
-                    if not has_many:
-                        del f['type']
-                        f['$ref'] = '#/definitions/' + field_serializer
-                else:
-                    field_serializer = None
-                    data_type = 'string'
-
-                if has_many:
-                    f['type'] = 'array'
-                    if field_serializer:
-                        f['items'] = {'$ref': '#/definitions/' + field_serializer}
-                    elif data_type in BaseMethodIntrospector.PRIMITIVES:
-                        f['items'] = {'type': data_type}
-            elif isinstance(field, ListField):
-                f['type'] = 'array'
-                if not field.child:
-                    f['items'] = {'type': 'string'}
-                child_type, child_format = get_data_type(field.child) or ('string', 'string')
-                f['items'] = {'type': child_type}
+            for f_key, d_key in data_mapping.items():
+                if field_data[d_key]:
+                    f[f_key] = field_data[d_key]
 
             # memorize discovered field
             data['fields'][name] = f
         return data
+

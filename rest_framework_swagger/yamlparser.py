@@ -370,11 +370,9 @@ class YAMLDocstringParser(object):
             if 'maximum' in field and data_type == 'integer':
                 f['maximum'] = str(field.get('maximum', 0))
 
-            # enum options
-            # @TODO apimatic doesn't use enum for querystrings
-            # enum = field.get('enum', [])
-            # if enum:
-            #     f['enum'] = enum
+            enum = field.get('enum', [])
+            if enum:
+                f['enum'] = enum
 
             # File support
             if f['type'] == 'file':
@@ -402,11 +400,9 @@ class YAMLDocstringParser(object):
                         meth_param['in'] = doc_param['in']
 
         for param_type in self.PARAM_TYPES:
-            if self.should_omit_parameters(param_type):
-                continue
-            parameters += self._apply_strategy(
-                param_type, method_params, docstring_params
-            )
+            for param in self._apply_strategy(param_type, method_params, docstring_params):
+                if not self.should_omit_parameter(param.get('name', ''), param.get('in', '')):
+                    parameters.append(param)
 
         # PATCH requests expects all fields except path fields to be optional
         if inspector.get_http_method() == "PATCH":
@@ -419,17 +415,30 @@ class YAMLDocstringParser(object):
     def discover_querystring_parameters(self, inspector):
         return self.get_yaml_parameters(inspector.callback, docstring_param_name='querystring_parameters')
 
-    def should_omit_parameters(self, param_type):
+    def should_omit_parameter(self, param_name, param_type):
         """
-        Checks if particular parameter types should be omitted explicitly
+        Checks if a particular parameter should be omitted explicitly.
         """
-        return param_type in self.object.get('omit_parameters', [])
+        for omitted in self.object.get("omit_parameters", []):
+            if isinstance(omitted, six.string_types):
+                if omitted == param_type:
+                    return True
+            elif isinstance(omitted, dict):
+                if omitted.get('name', None) == param_name and omitted.get("in", None) == param_type:
+                    return True
+        return False
 
     def should_omit_serializer(self):
         """
         Checks if serializer should be intentionally omitted
         """
         return self.object.get('omit_serializer', False)
+
+    def should_omit_endpoint(self):
+        """
+        Checks if the endpoint should be completely omitted
+        """
+        return self.object.get('omit_endpoint', False)
 
     def _apply_strategy(self, param_type, method_params, docstring_params):
         """

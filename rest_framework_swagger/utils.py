@@ -112,3 +112,10 @@ def normalize_data_format(data_type, data_format, obj):
         del obj['format']
     elif data_format is not None:
         obj['format'] = data_format
+
+
+def tag_from_prefix(url_path):
+    leading_segment = url_path.strip("/").split('/')[0]
+    if leading_segment:
+        return [leading_segment]
+    return []

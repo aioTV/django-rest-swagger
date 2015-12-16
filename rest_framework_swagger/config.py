@@ -10,18 +10,22 @@ class SwaggerConfig(object):
         'include_module_paths': [],
         'is_authenticated': False,
         'is_superuser': False,
-        'base_path': ''
+        'base_path': '',
+        'tag_matchers': ['rest_framework_swagger.utils.tag_from_prefix'],
     }
 
     def __init__(self):
         super(SwaggerConfig, self).__init__()
         self.global_settings = self.DEFAULT_SWAGGER_SETTINGS.copy()
-        self.global_settings.update(settings.SWAGGER_GLOBAL_SETTINGS)
+        self.global_settings.update(getattr(settings, 'SWAGGER_GLOBAL_SETTINGS', {}))
 
     def get_config(self, config_name=None):
         config_name = config_name or "default"
+        if not hasattr(settings, 'SWAGGER_LOCAL_SETTINGS'):
+            raise Exception("SWAGGER_LOCAL_SETTINGS not configured in settings")
         if config_name not in settings.SWAGGER_LOCAL_SETTINGS:
-            raise Exception("{} swagger settings not defined".format(config_name))
+            raise Exception("{} swagger settings not defined in SWAGGER_LOCAL_SETTINGS".format(config_name))
+
         current_config = self.global_settings.copy()
         current_config.update(settings.SWAGGER_LOCAL_SETTINGS[config_name])
         return current_config

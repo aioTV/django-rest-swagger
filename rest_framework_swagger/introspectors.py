@@ -10,7 +10,7 @@ from .compat import strip_tags, get_pagination_attribures
 from .yamlparser import YAMLDocstringParser
 from .constants import INTROSPECTOR_ENUMS, INTROSPECTOR_PRIMITIVES
 from .utils import (normalize_data_format, get_view_description,
-                    do_markdown, get_serializer_name)
+                    do_markdown, get_serializer_name, get_default_value)
 from abc import ABCMeta, abstractmethod
 
 from django.http import HttpRequest
@@ -18,6 +18,7 @@ from django.contrib.admindocs.utils import trim_docstring
 from django.utils.encoding import smart_text
 
 import rest_framework
+import rest_framework.filters
 from rest_framework import viewsets
 from rest_framework.utils import formatting
 from rest_framework.mixins import ListModelMixin
@@ -137,7 +138,7 @@ class BaseMethodIntrospector(object):
     def check_yaml_methods(self, yaml_methods):
         missing_set = set()
         for key in yaml_methods:
-            if key not in self.parent.methods():
+            if key != "*" and key not in self.parent.methods():
                 missing_set.add(key)
         if missing_set:
             raise Exception(
@@ -149,6 +150,7 @@ class BaseMethodIntrospector(object):
         parent_parser = YAMLDocstringParser(self.parent)
         self.check_yaml_methods(parent_parser.object.keys())
         new_object = {}
+        new_object.update(parent_parser.object.get("*", {}))
         new_object.update(parent_parser.object.get(self.method, {}))
         new_object.update(parser.object)
         parser.object = new_object
@@ -206,17 +208,26 @@ class BaseMethodIntrospector(object):
             self.get_docs() or self.parent.get_description())
 
     def get_operation_id(self):
-        """ Returns the APIView's operationId """
+        """
+        Returns the APIView's operationId. Defaults to generating an ID based on
+        the method and path.
+        """
         parser = self.get_yaml_parser()
         operation_id = parser.object.get('operationId', None)
         if not operation_id:
-            logger.error("No operationId defined for path {} on method {}".format(
-                parser.method_introspector.path,
-                parser.method_introspector.method
-            ))
-            return None
+            operation_id = self.method + "-" + self.path.strip("/").replace("/", "-")
 
         return operation_id
+
+    def get_consumes(self):
+        if not hasattr(self.callback, 'get_parsers'):
+            return []
+        return {r.media_type for r in self.callback().get_parsers()}
+
+    def get_produces(self):
+        if not hasattr(self.callback, 'get_renderers'):
+            return []
+        return {r.media_type for r in self.callback().get_renderers()}
 
     def get_description(self, use_markdown=False):
         """
@@ -253,12 +264,10 @@ class BaseMethodIntrospector(object):
         the DRF serializer fields
         """
         params = []
-        # path_params = self.build_path_parameters()
         query_params = self.build_query_parameters()
         pagination_params = self.build_pagination_parameters()
         if django_filters is not None:
-            query_params.extend(
-                self.build_query_parameters_from_django_filters())
+            query_params.extend(self.build_query_parameters_from_django_filters())
 
         if query_params:
             params += query_params
@@ -300,6 +309,27 @@ class BaseMethodIntrospector(object):
                 "$ref": "#/definitions/{}".format(serializer_name)
             }
         }
+
+    def get_form_parameters(self):
+        serializer = self.get_request_serializer_class()
+
+        fields = []
+        for field in extract_serializer_fields(serializer):
+            if field['read_only']:
+                continue
+            if field['type'] not in {"string", "number", "integer", "boolean", "array"}:
+                continue
+            parameter = {
+                'in': 'formData',
+                'name': field['name'],
+            }
+            normalize_data_format(field['type'], field['format'], parameter)
+            for key in ['description', 'required', 'enum']:
+                if field[key]:
+                    parameter[key] = field[key]
+            fields.append(parameter)
+
+        return fields
 
     def build_path_parameters(self):
         """
@@ -371,23 +401,24 @@ class BaseMethodIntrospector(object):
         introspect ``django_filters.FilterSet`` instances.
         """
         params = []
-        filter_class = getattr(self.callback, 'filter_class', None)
-        if (filter_class is not None and
-                issubclass(filter_class, django_filters.FilterSet)):
-            for name, filter_ in filter_class.base_filters.items():
-                data_type = 'string'
-                parameter = {
-                    'in': 'query',
-                    'name': name,
-                    'description': filter_.label,
-                }
-                normalize_data_format(data_type, None, parameter)
-                multiple_choices = filter_.extra.get('choices', {})
-                if multiple_choices:
-                    parameter['enum'] = [choice[0] for choice
-                                         in itertools.chain(multiple_choices)]
-                    # parameter['type'] = 'enum'
-                params.append(parameter)
+
+        # Default to showing filter params only for 'list' operation, but allow overriding this
+        if self.method not in self.get_yaml_parser().get_param('filter_methods', ['list']):
+            return params
+        if not hasattr(self.callback, "filter_backends"):
+            return params
+
+        serializer = self.get_serializer_class()
+        model = serializer.Meta.model if serializer else None
+
+        for filter_backend in self.callback.filter_backends:
+            if not issubclass(filter_backend, rest_framework.filters.DjangoFilterBackend):
+                continue
+            filter_introspector = DjangoFilterIntrospector(filter_backend, self, model)
+            parser = self.get_yaml_parser()
+
+            parser.object = parser.load_obj_from_docstring(filter_introspector.get_yaml()) or {}
+            params.extend(parser.discover_parameters(filter_introspector))
 
         return params
 
@@ -438,11 +469,28 @@ def get_data_type(field):
         # return 'string', 'string' # 'file upload'
     # elif isinstance(field, fields.CharField):
         # return 'string', 'string'
+    elif getattr(field, 'style', {}).get('input_type') == 'password':
+        return 'string', 'password'
 
     elif rest_framework.VERSION >= '3.0.0' and isinstance(field, fields.HiddenField):
         return 'hidden', 'hidden'
     else:
         return 'string', 'string'
+
+
+def get_filter_data_type(filter_):
+    from django.forms import fields
+    mapping = {
+        fields.BooleanField: ('boolean', 'boolean'),
+        fields.DateField: ('string', 'date'),
+        fields.DateTimeField: ('string', 'date-time'),
+        fields.IntegerField: ('integer', 'int64'),
+        fields.FloatField: ('integer', 'float'),
+    }
+    for clazz, value in mapping.items():
+        if isinstance(filter_.field, clazz):
+            return value
+    return 'string', 'string'
 
 
 class APIViewIntrospector(BaseViewIntrospector):
@@ -659,3 +707,148 @@ class ViewSetMethodIntrospector(BaseMethodIntrospector):
                 })
                 normalize_data_format(data_type, None, parameters[-1])
         return parameters
+
+
+def extract_serializer_fields(serializer):
+    if serializer is None:
+        return []
+
+    if hasattr(serializer, '__call__'):
+        fields = serializer().get_fields()
+    else:
+        fields = serializer.get_fields()
+
+    serializer_data = []
+    for name, field in fields.items():
+        data_type, data_format = get_data_type(field) or ('string', 'string')
+
+        if data_type == 'hidden':
+            continue
+
+        field_data = {
+            'minimum': None,
+            'maximum': None,
+            'enum': None,
+            'items': None,
+            '$ref': None,
+            'name': name,
+            'type': data_type,
+            'format': data_format,
+            'write_only': getattr(field, 'write_only', False),
+            'read_only': getattr(field, 'read_only', False),
+            'required': getattr(field, 'required', False),
+            'default': get_default_value(field),
+        }
+
+        help_text = getattr(field, 'help_text', '')
+        field_data['description'] = help_text.strip() if help_text else ''
+
+        # guess format
+        # data_format = 'string'
+        # if data_type in BaseMethodIntrospector.PRIMITIVES:
+        # data_format = BaseMethodIntrospector.PRIMITIVES.get(data_type)[0]
+
+
+        # Min/Max values
+        max_value = getattr(field, 'max_value', None)
+        min_value = getattr(field, 'min_value', None)
+
+        if data_type == 'integer':
+            field_data['minimum'] = min_value
+            field_data['maximum'] = max_value
+
+        # ENUM options
+        if data_type in BaseMethodIntrospector.ENUMS:
+            if isinstance(field.choices, list):
+                field_data['enum'] = [k for k, v in field.choices]
+            elif isinstance(field.choices, dict):
+                field_data['enum'] = [k for k, v in field.choices.items()]
+
+        # Support for complex types
+        if rest_framework.VERSION < '3.0.0':
+            has_many = hasattr(field, 'many') and field.many
+        else:
+            from rest_framework.serializers import ListSerializer, ManyRelatedField
+            has_many = isinstance(field, (ListSerializer, ManyRelatedField))
+
+        if isinstance(field, rest_framework.serializers.BaseSerializer) or has_many:
+            if hasattr(field, 'is_documented') and not field.is_documented:
+                field_data['type'] = 'object'
+            elif isinstance(field, rest_framework.serializers.BaseSerializer):
+                field_serializer = get_serializer_name(field)
+
+                if getattr(field, 'write_only', False):
+                    field_serializer = "Write{}".format(field_serializer)
+
+                if not has_many:
+                    #del field_data['type']
+                    field_data['$ref'] = '#/definitions/' + field_serializer
+            else:
+                field_serializer = None
+                data_type = 'string'
+
+            if has_many:
+                field_data['type'] = 'array'
+                if field_serializer:
+                    field_data['items'] = {'$ref': '#/definitions/' + field_serializer}
+                elif data_type in BaseMethodIntrospector.PRIMITIVES:
+                    field_data['items'] = {'type': data_type}
+        elif isinstance(field, rest_framework.serializers.ListField):
+            field_data['type'] = 'array'
+            if not field.child:
+                field_data['items'] = {'type': 'string'}
+            child_type, child_format = get_data_type(field.child) or ('string', 'string')
+            field_data['items'] = {'type': child_type}
+        serializer_data.append(field_data)
+    return serializer_data
+
+
+class DjangoFilterIntrospector(object):
+    def __init__(self, filter_backend, parent, model):
+        self.method = parent.method
+        self.parent = parent
+        self.callback = parent.callback
+        self.path = parent.path
+        self.user = parent.user
+
+        self.filter_backend = filter_backend
+        qs = model.objects.none() if model else None
+        self.filter_class = default_filter_class = self.filter_backend.default_filter_set
+        if qs is not None:
+            self.filter_class = filter_backend().get_filter_class(self.callback, qs) or default_filter_class
+
+    def get_yaml(self):
+        meta_spec =  getattr(getattr(self.filter_class, 'Meta', None), 'swagger_spec', '')
+        doc_string = getattr(self.filter_class, '__doc__', '')
+        return meta_spec or doc_string
+
+    def get_http_method(self):
+        return self.parent.get_http_method()
+
+    def get_parameters(self):
+        if not self.filter_class or self.filter_class == rest_framework.filters.DjangoFilterBackend.default_filter_set:
+            return []
+
+        params = []
+        for name, filter_ in self.filter_class.base_filters.items():
+            if name in getattr(getattr(self.filter_class, 'Meta', {}), 'swagger_exclude', []):
+                continue
+
+            data_type, data_format = get_filter_data_type(filter_)
+            parameter = {
+                'in': 'query',
+                'name': name,
+            }
+
+            description = filter_.label or getattr(filter_.field, 'help_text', None)
+            if description:
+                parameter['description'] = description
+
+            normalize_data_format(data_type, data_format, parameter)
+            multiple_choices = filter_.extra.get('choices', {})
+            if multiple_choices:
+                parameter['enum'] = [choice[0] for choice
+                                     in itertools.chain(multiple_choices)]
+            params.append(parameter)
+
+        return params
