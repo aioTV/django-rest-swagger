@@ -43,22 +43,22 @@ class DocumentationGenerator(object):
             self.explicit_response_types.update({
                 self.default_payload_definition_name: self.default_payload_definition
             })
-        return {
-            'swagger': '2.0',
-            'info': self.config.get('info', {
+        return OrderedDict([
+            ('swagger', '2.0'),
+            ('info', self.config.get('info', {
                 'contact': {},
                 'title': 'API Documentation',
                 'version': self.request.version,
                 'description': '',
-            }),
-            'basePath': self.config.get("base_path", ''),
-            'host': self.config.get('host', self.request.get_host()),
-            'schemes': self.config.get('schemes', ["https" if self.request.is_secure() else "http"]),
-            'paths': self.get_paths(endpoints_conf),
-            'definitions': self.get_definitions(endpoints_conf),
-            'securityDefinitions': self.config.get('securityDefinitions', {}),
-            'tags': self.config.get('tags', []),
-        }
+            })),
+            ('basePath', self.config.get("base_path", '')),
+            ('host', self.config.get('host', self.request.get_host())),
+            ('schemes', self.config.get('schemes', ["https" if self.request.is_secure() else "http"])),
+            ('securityDefinitions', self.config.get('securityDefinitions', {})),
+            ('tags', self.config.get('tags', [])),
+            ('paths', self.get_paths(endpoints_conf)),
+            ('definitions', self.get_definitions(endpoints_conf)),
+        ])
 
     def get_paths(self, endpoints_conf):
         paths_dict = {}
