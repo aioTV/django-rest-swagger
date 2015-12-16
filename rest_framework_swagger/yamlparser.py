@@ -370,11 +370,9 @@ class YAMLDocstringParser(object):
             if 'maximum' in field and data_type == 'integer':
                 f['maximum'] = str(field.get('maximum', 0))
 
-            # enum options
-            # @TODO apimatic doesn't use enum for querystrings
-            # enum = field.get('enum', [])
-            # if enum:
-            #     f['enum'] = enum
+            enum = field.get('enum', [])
+            if enum:
+                f['enum'] = enum
 
             # File support
             if f['type'] == 'file':
