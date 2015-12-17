@@ -20,6 +20,18 @@ from .compat import OrderedDict
 from .utils import extract_base_path, get_serializer_name
 
 
+METHOD_TO_RESPONSE_CODE = {
+    'POST': {
+        'code': '201',
+        'description': 'Successfully created',
+    },
+    'DELETE': {
+        'code': '204',
+        'description': 'Successfully deleted',
+    },
+}
+
+
 class DocumentationGenerator(object):
     # Serializers defined in docstrings
     explicit_serializers = set()
@@ -79,7 +91,7 @@ class DocumentationGenerator(object):
 
         method_introspectors = self.get_method_introspectors(api_endpoint, introspector)
         # we get the main parameters (common to all operations) from the first view operation
-        # only path parameters are commont to all operations
+        # only path parameters are common to all operations
         path_item['parameters'] = method_introspectors[0].build_path_parameters()
 
         return path_item
@@ -139,7 +151,6 @@ class DocumentationGenerator(object):
             # set default response reference
             if self.default_payload_definition:
                 response_messages['default'] = {
-                    "description": "error payload",
                     "schema": {
                         "$ref": "#/definitions/{}".format(self.default_payload_definition_name)
                     }
@@ -148,8 +159,12 @@ class DocumentationGenerator(object):
             # overwrite default and add more responses from docstrings
             response_messages.update(doc_parser.get_response_messages())
 
-            response_messages['200'] = {
+            response_details = METHOD_TO_RESPONSE_CODE.get(operation_method, {
+                'code': '200',
                 'description': 'Successful operation',
+            })
+            response_messages[response_details['code']] = {
+                'description': response_details['description'],
                 'schema': {
                     '$ref': '#/definitions/' + response_type
                 } if response_type != 'object' else {
