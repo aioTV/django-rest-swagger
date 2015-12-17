@@ -291,6 +291,9 @@ class DocumentationGenerator(object):
         for endpoint in endpoints_conf:
             introspector = self.get_introspector(endpoint)
             for method_introspector in introspector:
+                if method_introspector.get_yaml_parser().should_omit_endpoint():
+                    continue
+
                 serializer = self._get_method_serializer(method_introspector)
                 if serializer is not None:
                     serializers.add(serializer)
