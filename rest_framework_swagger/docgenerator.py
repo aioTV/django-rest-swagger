@@ -2,6 +2,8 @@
 from django.contrib.auth.models import AnonymousUser
 from django.utils.module_loading import import_string
 import rest_framework
+import collections
+import json
 
 from rest_framework import viewsets, mixins
 from rest_framework.generics import GenericAPIView
@@ -118,6 +120,9 @@ class DocumentationGenerator(object):
 
             response_type = self._get_method_response_type(
                 doc_parser, serializer, introspector, method_introspector)
+            is_paginated = (method_introspector.method == 'list') # TODO: allow yaml override
+            if is_paginated:
+                response_type = self._paginate_response_type(response_type, method_introspector)
 
             operation_method = method_introspector.get_http_method()
 
@@ -191,6 +196,22 @@ class DocumentationGenerator(object):
             'description': 'Successful operation',
             'schema': schema,
         }
+
+    def _paginate_response_type(self, response_type, method_introspector):
+        doc_parser = method_introspector.get_yaml_parser()
+        definition_name = response_type + "Page"
+        page_definition = doc_parser.get_param('page_definition', self.config.get('default_page_definition'))
+
+        # replace $ref: #/definitions/* with the correct type
+        replacement = '"type":"object"' if response_type == "object" else '"$ref": "#/definitions/{}"'.format(response_type)
+        json_page = json.dumps(page_definition)
+        page_definition = json.loads(
+            json_page.replace('"$ref": "#/definitions/*"', replacement),
+            object_pairs_hook=collections.OrderedDict
+        )
+
+        self.explicit_response_types[definition_name] = page_definition
+        return definition_name
 
     def _get_operation_parameters(self, introspector, method, consumes):
         """
