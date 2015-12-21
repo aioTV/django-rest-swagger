@@ -2,8 +2,6 @@
 from django.contrib.auth.models import AnonymousUser
 from django.utils.module_loading import import_string
 import rest_framework
-import collections
-import json
 
 from rest_framework import viewsets, mixins
 from rest_framework.generics import GenericAPIView
@@ -19,7 +17,7 @@ from .introspectors import (
     extract_serializer_fields,
 )
 from .compat import OrderedDict
-from .utils import extract_base_path, get_serializer_name
+from .utils import extract_base_path, get_serializer_name, template_dict
 
 
 class DocumentationGenerator(object):
@@ -163,7 +161,7 @@ class DocumentationGenerator(object):
             response_messages.update(doc_parser.get_response_messages())
 
             # Remove blank response objects - allows yaml to remove default responses
-            for code in response_messages:
+            for code in list(response_messages):
                 if not response_messages[code]:
                     del response_messages[code]
 
@@ -176,11 +174,10 @@ class DocumentationGenerator(object):
         return operations
 
     def _get_default_response_object(self, operation_method, response_type):
-        schema = {
-            '$ref': '#/definitions/' + response_type
-        } if response_type != 'object' else {
-            'type': response_type
-        }
+        if response_type == "object":
+            schema = {'type': 'object'}
+        else:
+            schema = {'$ref': '#/definitions/' + response_type}
 
         if operation_method == 'DELETE':
             return '204', {
@@ -200,15 +197,14 @@ class DocumentationGenerator(object):
     def _paginate_response_type(self, response_type, method_introspector):
         doc_parser = method_introspector.get_yaml_parser()
         definition_name = response_type + "Page"
-        page_definition = doc_parser.get_param('page_definition', self.config.get('default_page_definition'))
 
-        # replace $ref: #/definitions/* with the correct type
-        replacement = '"type":"object"' if response_type == "object" else '"$ref": "#/definitions/{}"'.format(response_type)
-        json_page = json.dumps(page_definition)
-        page_definition = json.loads(
-            json_page.replace('"$ref": "#/definitions/*"', replacement),
-            object_pairs_hook=collections.OrderedDict
-        )
+        if response_type == "object":
+            replacement = ("type", "object")
+        else:
+            replacement = ("$ref", "#/definitions/{}".format(response_type))
+
+        page_definition = doc_parser.get_param('page_definition', self.config.get('default_page_definition'))
+        page_definition = template_dict(page_definition, ('$ref', '#/definitions/*'), replacement)
 
         self.explicit_response_types[definition_name] = page_definition
         return definition_name

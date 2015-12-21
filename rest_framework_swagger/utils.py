@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from collections import OrderedDict
+
 import rest_framework
 import inspect
 
@@ -122,3 +124,14 @@ def tag_from_prefix(url_path):
     if leading_segment:
         return [leading_segment]
     return []
+
+
+def template_dict(root, find, replace):
+    if hasattr(root, 'items'):
+        return OrderedDict([
+            replace if (k, v) == find else (k, template_dict(v, find, replace))
+            for k, v in root.items()
+        ])
+    if isinstance(root, list):
+        return [template_dict(v, find, replace) for v in root]
+    return root
