@@ -20,18 +20,6 @@ from .compat import OrderedDict
 from .utils import extract_base_path, get_serializer_name
 
 
-METHOD_TO_RESPONSE_CODE = {
-    'POST': {
-        'code': '201',
-        'description': 'Successfully created',
-    },
-    'DELETE': {
-        'code': '204',
-        'description': 'Successfully deleted',
-    },
-}
-
-
 class DocumentationGenerator(object):
     # Serializers defined in docstrings
     explicit_serializers = set()
@@ -162,26 +150,44 @@ class DocumentationGenerator(object):
                     }
                 }
 
+            response_code, response_obj = self._get_default_response_object(operation_method, response_type)
+            response_messages[response_code] = response_obj
+
             # overwrite default and add more responses from docstrings
             response_messages.update(doc_parser.get_response_messages())
 
-            response_details = METHOD_TO_RESPONSE_CODE.get(operation_method, {
-                'code': '200',
-                'description': 'Successful operation',
-            })
-            response_messages[response_details['code']] = {
-                'description': response_details['description'],
-                'schema': {
-                    '$ref': '#/definitions/' + response_type
-                } if response_type != 'object' else {
-                    'type': response_type
-                }
-            }
+            # Remove blank response objects - allows yaml to remove default responses
+            for code in response_messages:
+                if not response_messages[code]:
+                    del response_messages[code]
+
             operation['responses'] = response_messages
 
             operations.append(operation)
 
         return operations
+
+    def _get_default_response_object(self, operation_method, response_type):
+        schema = {
+            '$ref': '#/definitions/' + response_type
+        } if response_type != 'object' else {
+            'type': response_type
+        }
+
+        if operation_method == 'DELETE':
+            return '204', {
+                'description': 'Successfully deleted',
+            }
+        if operation_method == 'POST':
+            return '201', {
+                'description': 'Successfully created',
+                'schema': schema,
+            }
+
+        return '200', {
+            'description': 'Successful operation',
+            'schema': schema,
+        }
 
     def _get_operation_parameters(self, introspector, method, consumes):
         """
