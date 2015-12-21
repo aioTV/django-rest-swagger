@@ -120,8 +120,8 @@ class DocumentationGenerator(object):
 
             response_type = self._get_method_response_type(
                 doc_parser, serializer, introspector, method_introspector)
-            is_paginated = (method_introspector.method == 'list') # TODO: allow yaml override
-            if is_paginated:
+
+            if doc_parser.get_param('paginated', (method_introspector.method == 'list')):
                 response_type = self._paginate_response_type(response_type, method_introspector)
 
             operation_method = method_introspector.get_http_method()
