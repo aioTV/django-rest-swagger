@@ -18,10 +18,13 @@ def get_serializer_name(serializer):
         if hasattr(serializer, 'Meta') and hasattr(serializer.Meta, 'swagger_name') and serializer.Meta.swagger_name:
             return serializer.Meta.swagger_name
 
-        if inspect.isclass(serializer):
-            return serializer.__name__
+        if not inspect.isclass(serializer):
+            serializer = serializer.__class__
 
-        return serializer.__class__.__name__
+        if serializer.__name__.endswith("Serializer"):
+            return serializer.__name__[:-len("Serializer")]
+
+        return serializer.__name__
 
 
 def get_view_description(view_cls, html=False, docstring=None):
