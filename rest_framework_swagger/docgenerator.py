@@ -35,6 +35,7 @@ class DocumentationGenerator(object):
         self.user = for_user or AnonymousUser()
         self.request = request
         self._tag_matchers = map(import_string, self.config.get('tag_matchers'))
+        self._operation_filters = map(import_string, self.config.get('operation_filters', []))
 
     def get_root(self, endpoints_conf):
         self.default_payload_definition_name = self.config.get("default_payload_definition_name", None)
@@ -162,6 +163,8 @@ class DocumentationGenerator(object):
                     del response_messages[code]
 
             operation['responses'] = response_messages
+            for filter_ in self._operation_filters:
+                filter_(operation, callback=method_introspector.callback, method=method_introspector.method)
 
             operations.append(operation)
 
