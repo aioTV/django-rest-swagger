@@ -77,7 +77,9 @@ class DocumentationGenerator(object):
         for endpoint in endpoints_conf:
             # remove the base_path from the begining of the path
             endpoint['path'] = extract_base_path(path=endpoint['path'], base_path=self.config.get('base_path'))
-            paths_dict[endpoint['path']] = self.get_path_item(endpoint)
+            path_item = self.get_path_item(endpoint)
+            if path_item:
+                paths_dict[endpoint['path']] = path_item
         paths_dict = OrderedDict(sorted(paths_dict.items()))
         return paths_dict
 
@@ -88,6 +90,10 @@ class DocumentationGenerator(object):
 
         for operation in self.get_operations(api_endpoint, introspector):
             path_item[operation.pop('method').lower()] = operation
+
+        # No operations for this path
+        if not path_item:
+            return path_item
 
         method_introspectors = self.get_method_introspectors(api_endpoint, introspector)
         # we get the main parameters (common to all operations) from the first view operation
