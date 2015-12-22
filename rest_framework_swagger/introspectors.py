@@ -225,7 +225,7 @@ class BaseMethodIntrospector(object):
             return []
         return {r.media_type for r in self.callback().get_renderers()}
 
-    def get_description(self, use_markdown=False):
+    def get_description(self):
         """
         Returns the body of the docstring trimmed before any parameters are
         listed. First, get the class docstring and then get the method's. The
@@ -255,7 +255,7 @@ class BaseMethodIntrospector(object):
                 docstring += '\n' + method_docs
         docstring = docstring.strip()
 
-        return do_markdown(docstring) if use_markdown else docstring.replace("\n", " ")
+        return docstring
 
     def get_parameters(self):
         """
