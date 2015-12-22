@@ -293,13 +293,14 @@ class YAMLDocstringParser(object):
         messages = {}
         response_messages = self.object.get('responseMessages', [])
         for message in response_messages:
-            data = {
-                'description': message.get('description', '')
-            }
+            data = {}
+            description = message.get('description', None)
+            if description is not None:
+                data['description'] = description
             schema = message.get('schema', None)
             if schema:
                 data['schema'] = schema
-            messages[message.get('code')] = data
+            messages[str(message.get('code'))] = data
         return messages
 
     def get_view_mocker(self, callback):
