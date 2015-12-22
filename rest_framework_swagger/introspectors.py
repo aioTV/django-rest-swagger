@@ -820,9 +820,6 @@ class DjangoFilterIntrospector(object):
 
         params = []
         for name, filter_ in self.filter_class.base_filters.items():
-            if name in getattr(getattr(self.filter_class, 'Meta', {}), 'swagger_exclude', []):
-                continue
-
             data_type, data_format = get_filter_data_type(filter_)
             parameter = {
                 'in': 'query',
