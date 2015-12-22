@@ -248,7 +248,11 @@ class BaseMethodIntrospector(object):
             method_docs = IntrospectorHelper.strip_params_from_docstring(
                 method_docs
             )
-            docstring += '\n' + method_docs
+
+            if self.get_yaml_parser().get_param('replace_docs', False):
+                docstring = method_docs
+            else:
+                docstring += '\n' + method_docs
         docstring = docstring.strip()
 
         return do_markdown(docstring) if use_markdown else docstring.replace("\n", " ")
