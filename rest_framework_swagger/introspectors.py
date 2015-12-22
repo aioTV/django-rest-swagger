@@ -149,7 +149,14 @@ class BaseMethodIntrospector(object):
         return self.get_yaml_parser().get_extra_serializer_classes(
             self.callback)
 
+    def get_method_overrides(self):
+        return getattr(getattr(self.callback, self.method, None), 'kwargs', {})
+
     def ask_for_serializer_class(self):
+        override = self.get_method_overrides().get('serializer_class')
+        if override:
+            return override
+
         if hasattr(self.callback, 'get_serializer_class'):
             view = self.create_view()
             parser = self.get_yaml_parser()
