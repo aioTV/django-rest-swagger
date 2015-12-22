@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from django.conf import settings
+from .constants import DEFAULT_PAGE_DEFINITION
 
 
 class SwaggerConfig(object):
@@ -12,6 +13,7 @@ class SwaggerConfig(object):
         'is_superuser': False,
         'base_path': '',
         'tag_matchers': ['rest_framework_swagger.utils.tag_from_prefix'],
+        'default_page_definition': DEFAULT_PAGE_DEFINITION,
     }
 
     def __init__(self):

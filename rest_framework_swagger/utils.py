@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from collections import OrderedDict
+
 import rest_framework
 import inspect
 
@@ -18,10 +20,13 @@ def get_serializer_name(serializer):
         if hasattr(serializer, 'Meta') and hasattr(serializer.Meta, 'swagger_name') and serializer.Meta.swagger_name:
             return serializer.Meta.swagger_name
 
-        if inspect.isclass(serializer):
-            return serializer.__name__
+        if not inspect.isclass(serializer):
+            serializer = serializer.__class__
 
-        return serializer.__class__.__name__
+        if serializer.__name__.endswith("Serializer"):
+            return serializer.__name__[:-len("Serializer")]
+
+        return serializer.__name__
 
 
 def get_view_description(view_cls, html=False, docstring=None):
@@ -119,3 +124,14 @@ def tag_from_prefix(url_path):
     if leading_segment:
         return [leading_segment]
     return []
+
+
+def template_dict(root, find, replace):
+    if hasattr(root, 'items'):
+        return OrderedDict([
+            replace if (k, v) == find else (k, template_dict(v, find, replace))
+            for k, v in root.items()
+        ])
+    if isinstance(root, list):
+        return [template_dict(v, find, replace) for v in root]
+    return root

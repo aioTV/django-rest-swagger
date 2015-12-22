@@ -17,7 +17,7 @@ from .introspectors import (
     extract_serializer_fields,
 )
 from .compat import OrderedDict
-from .utils import extract_base_path, get_serializer_name
+from .utils import extract_base_path, get_serializer_name, template_dict
 
 
 class DocumentationGenerator(object):
@@ -35,6 +35,7 @@ class DocumentationGenerator(object):
         self.user = for_user or AnonymousUser()
         self.request = request
         self._tag_matchers = map(import_string, self.config.get('tag_matchers'))
+        self._operation_filters = map(import_string, self.config.get('operation_filters', []))
 
     def get_root(self, endpoints_conf):
         self.default_payload_definition_name = self.config.get("default_payload_definition_name", None)
@@ -65,7 +66,9 @@ class DocumentationGenerator(object):
         for endpoint in endpoints_conf:
             # remove the base_path from the begining of the path
             endpoint['path'] = extract_base_path(path=endpoint['path'], base_path=self.config.get('base_path'))
-            paths_dict[endpoint['path']] = self.get_path_item(endpoint)
+            path_item = self.get_path_item(endpoint)
+            if path_item:
+                paths_dict[endpoint['path']] = path_item
         paths_dict = OrderedDict(sorted(paths_dict.items()))
         return paths_dict
 
@@ -77,9 +80,13 @@ class DocumentationGenerator(object):
         for operation in self.get_operations(api_endpoint, introspector):
             path_item[operation.pop('method').lower()] = operation
 
+        # No operations for this path
+        if not path_item:
+            return path_item
+
         method_introspectors = self.get_method_introspectors(api_endpoint, introspector)
         # we get the main parameters (common to all operations) from the first view operation
-        # only path parameters are commont to all operations
+        # only path parameters are common to all operations
         path_item['parameters'] = method_introspectors[0].build_path_parameters()
 
         return path_item
@@ -112,6 +119,9 @@ class DocumentationGenerator(object):
             response_type = self._get_method_response_type(
                 doc_parser, serializer, introspector, method_introspector)
 
+            if doc_parser.get_param('paginated', (method_introspector.method == 'list')):
+                response_type = self._paginate_response_type(response_type, method_introspector)
+
             operation_method = method_introspector.get_http_method()
 
             produces = method_introspector.get_produces()
@@ -139,28 +149,65 @@ class DocumentationGenerator(object):
             # set default response reference
             if self.default_payload_definition:
                 response_messages['default'] = {
-                    "description": "error payload",
                     "schema": {
                         "$ref": "#/definitions/{}".format(self.default_payload_definition_name)
                     }
                 }
 
+            response_code, response_obj = self._get_default_response_object(operation_method, response_type)
+            response_messages[response_code] = response_obj
+
             # overwrite default and add more responses from docstrings
             response_messages.update(doc_parser.get_response_messages())
 
-            response_messages['200'] = {
-                'description': 'Successful operation',
-                'schema': {
-                    '$ref': '#/definitions/' + response_type
-                } if response_type != 'object' else {
-                    'type': response_type
-                }
-            }
+            # Remove blank response objects - allows yaml to remove default responses
+            for code in list(response_messages):
+                if not response_messages[code]:
+                    del response_messages[code]
+
             operation['responses'] = response_messages
+            for filter_ in self._operation_filters:
+                filter_(operation, callback=method_introspector.callback, method=method_introspector.method)
 
             operations.append(operation)
 
         return operations
+
+    def _get_default_response_object(self, operation_method, response_type):
+        if response_type == "object":
+            schema = {'type': 'object'}
+        else:
+            schema = {'$ref': '#/definitions/' + response_type}
+
+        if operation_method == 'DELETE':
+            return '204', {
+                'description': 'Successfully deleted',
+            }
+        if operation_method == 'POST':
+            return '201', {
+                'description': 'Successfully created',
+                'schema': schema,
+            }
+
+        return '200', {
+            'description': 'Successful operation',
+            'schema': schema,
+        }
+
+    def _paginate_response_type(self, response_type, method_introspector):
+        doc_parser = method_introspector.get_yaml_parser()
+        definition_name = response_type + "Page"
+
+        if response_type == "object":
+            replacement = ("type", "object")
+        else:
+            replacement = ("$ref", "#/definitions/{}".format(response_type))
+
+        page_definition = doc_parser.get_param('page_definition', self.config.get('default_page_definition'))
+        page_definition = template_dict(page_definition, ('$ref', '#/definitions/*'), replacement)
+
+        self.explicit_response_types[definition_name] = page_definition
+        return definition_name
 
     def _get_operation_parameters(self, introspector, method, consumes):
         """
@@ -276,6 +323,9 @@ class DocumentationGenerator(object):
         for endpoint in endpoints_conf:
             introspector = self.get_introspector(endpoint)
             for method_introspector in introspector:
+                if method_introspector.get_yaml_parser().should_omit_endpoint():
+                    continue
+
                 serializer = self._get_method_serializer(method_introspector)
                 if serializer is not None:
                     serializers.add(serializer)
