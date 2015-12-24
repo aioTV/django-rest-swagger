@@ -149,7 +149,14 @@ class BaseMethodIntrospector(object):
         return self.get_yaml_parser().get_extra_serializer_classes(
             self.callback)
 
+    def get_method_overrides(self):
+        return getattr(getattr(self.callback, self.method, None), 'kwargs', {})
+
     def ask_for_serializer_class(self):
+        override = self.get_method_overrides().get('serializer_class')
+        if override:
+            return override
+
         if hasattr(self.callback, 'get_serializer_class'):
             view = self.create_view()
             parser = self.get_yaml_parser()
@@ -218,7 +225,7 @@ class BaseMethodIntrospector(object):
             return []
         return {r.media_type for r in self.callback().get_renderers()}
 
-    def get_description(self, use_markdown=False):
+    def get_description(self):
         """
         Returns the body of the docstring trimmed before any parameters are
         listed. First, get the class docstring and then get the method's. The
@@ -241,10 +248,14 @@ class BaseMethodIntrospector(object):
             method_docs = IntrospectorHelper.strip_params_from_docstring(
                 method_docs
             )
-            docstring += '\n' + method_docs
+
+            if self.get_yaml_parser().get_param('replace_docs', False):
+                docstring = method_docs
+            else:
+                docstring += '\n' + method_docs
         docstring = docstring.strip()
 
-        return do_markdown(docstring) if use_markdown else docstring.replace("\n", " ")
+        return docstring
 
     def get_parameters(self):
         """
@@ -820,9 +831,6 @@ class DjangoFilterIntrospector(object):
 
         params = []
         for name, filter_ in self.filter_class.base_filters.items():
-            if name in getattr(getattr(self.filter_class, 'Meta', {}), 'swagger_exclude', []):
-                continue
-
             data_type, data_format = get_filter_data_type(filter_)
             parameter = {
                 'in': 'query',
