@@ -266,6 +266,8 @@ class BaseMethodIntrospector(object):
         params = []
         query_params = self.build_query_parameters()
         pagination_params = self.build_pagination_parameters()
+        query_params.extend(self.build_query_params_from_default_backends())
+
         if django_filters is not None:
             query_params.extend(self.build_query_parameters_from_django_filters())
 
@@ -396,6 +398,61 @@ class BaseMethodIntrospector(object):
             return params
         return None
 
+
+    def _get_valid_ordering_fields(self, ordering_backend):
+        # Based on OrderingBackend#remove_invalid_fields
+        valid_fields = getattr(callback, 'ordering_fields', backend_instance.ordering_fields)
+        serializer_class = self.get_serializer_class()
+
+        if not serializer_class:
+            return valid_fields or []
+
+        if valid_fields is None:
+            return [
+                field.source or field_name
+                for field_name, field in serializer_class().fields.items()
+                if not getattr(field, 'write_only', False)
+            ]
+        if valid_fields == '__all__':
+            return [field.name for field in serializer_class.Meta.model._meta.fields]
+
+        return valid_fields or []
+
+    def build_query_params_from_default_backends(self):
+        params = []
+
+        # Default to showing filter params only for 'list' operation, but allow overriding this
+        if self.method not in self.get_yaml_parser().get_param('filter_methods', ['list']):
+            return params
+
+        for filter_backend in getattr(self.callback, 'filter_backends', []):
+            if issubclass(filter_backend, rest_framework.filters.SearchFilter):
+                params.append({
+                    'in': 'query',
+                    'name': filter_backend.search_param,
+                    'description': "Search term",
+                    'type': 'string'
+                })
+            if issubclass(filter_backend, rest_framework.filters.OrderingFilter):
+                backend_instance = filter_backend()
+                default_order = list(backend_instance.get_default_ordering(self.callback)) # TODO
+                possible_values = self._get_valid_ordering_fields(backend_instance)
+
+                params.append({
+                    'in': 'query',
+                    'name': filter_backend.ordering_param,
+                    'description': "",
+                    'type': 'array',
+                    'default': default_order,
+                    'collectionFormat': 'csv',
+                    'items': {
+                        'type': 'string',
+                        'enum': possible_values,
+                    },
+                })
+
+        return params
+
     def build_query_parameters_from_django_filters(self):
         """
         introspect ``django_filters.FilterSet`` instances.
@@ -405,13 +462,11 @@ class BaseMethodIntrospector(object):
         # Default to showing filter params only for 'list' operation, but allow overriding this
         if self.method not in self.get_yaml_parser().get_param('filter_methods', ['list']):
             return params
-        if not hasattr(self.callback, "filter_backends"):
-            return params
 
         serializer = self.get_serializer_class()
         model = serializer.Meta.model if serializer else None
 
-        for filter_backend in self.callback.filter_backends:
+        for filter_backend in getattr(self.callback, 'filter_backends', []):
             if not issubclass(filter_backend, rest_framework.filters.DjangoFilterBackend):
                 continue
             filter_introspector = DjangoFilterIntrospector(filter_backend, self, model)
