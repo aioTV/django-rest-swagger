@@ -10,7 +10,7 @@ from .compat import strip_tags, get_pagination_attribures
 from .yamlparser import YAMLDocstringParser
 from .constants import INTROSPECTOR_ENUMS, INTROSPECTOR_PRIMITIVES
 from .utils import (normalize_data_format, get_view_description,
-                    do_markdown, get_serializer_name, get_default_value)
+                    do_markdown, get_serializer_name, get_default_value, get_normalized_data_format)
 from abc import ABCMeta, abstractmethod
 
 from django.http import HttpRequest
@@ -780,6 +780,8 @@ def extract_serializer_fields(serializer):
         if data_type == 'hidden':
             continue
 
+        data_format = get_normalized_data_format(data_type, data_format)
+
         field_data = {
             'minimum': None,
             'maximum': None,
@@ -827,19 +829,16 @@ def extract_serializer_fields(serializer):
             has_many = isinstance(field, (ListSerializer, ManyRelatedField))
 
         if isinstance(field, rest_framework.serializers.BaseSerializer) or has_many:
+            field_serializer = None
             if hasattr(field, 'is_documented') and not field.is_documented:
                 field_data['type'] = 'object'
             elif isinstance(field, rest_framework.serializers.BaseSerializer):
                 field_serializer = get_serializer_name(field)
-
                 if getattr(field, 'write_only', False):
                     field_serializer = "Write{}".format(field_serializer)
-
                 if not has_many:
-                    #del field_data['type']
                     field_data['$ref'] = '#/definitions/' + field_serializer
             else:
-                field_serializer = None
                 data_type = 'string'
 
             if has_many:
@@ -848,12 +847,14 @@ def extract_serializer_fields(serializer):
                     field_data['items'] = {'$ref': '#/definitions/' + field_serializer}
                 elif data_type in BaseMethodIntrospector.PRIMITIVES:
                     field_data['items'] = {'type': data_type}
+
         elif isinstance(field, rest_framework.serializers.ListField):
             field_data['type'] = 'array'
             if not field.child:
                 field_data['items'] = {'type': 'string'}
             child_type, child_format = get_data_type(field.child) or ('string', 'string')
             field_data['items'] = {'type': child_type}
+
         serializer_data.append(field_data)
     return serializer_data
 
