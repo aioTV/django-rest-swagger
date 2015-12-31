@@ -21,21 +21,19 @@ from .utils import extract_base_path, get_serializer_name, template_dict
 
 
 class DocumentationGenerator(object):
-    # Serializers defined in docstrings
-    explicit_serializers = set()
-
-    # Serializers defined in fields
-    fields_serializers = set()
-
-    # Response classes defined in docstrings
-    explicit_response_types = dict()
-
     def __init__(self, for_user=None, config=None, request=None):
         self.config = config
         self.user = for_user or AnonymousUser()
         self.request = request
         self._tag_matchers = map(import_string, self.config.get('tag_matchers'))
         self._operation_filters = map(import_string, self.config.get('operation_filters', []))
+        # Serializers defined in docstrings
+        self.explicit_serializers = set()
+        # Serializers defined in fields
+        self.fields_serializers = set()
+        # Response classes defined in docstrings
+        self.explicit_response_types = dict()
+
 
     def get_root(self, endpoints_conf):
         self.default_payload_definition_name = self.config.get("default_payload_definition_name", None)
