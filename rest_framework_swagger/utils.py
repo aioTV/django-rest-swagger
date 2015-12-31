@@ -89,28 +89,26 @@ def multi_getattr(obj, attr, default=None):
     return obj
 
 
-def normalize_data_format(data_type, data_format, obj):
+def get_normalized_data_format(data_type, data_format):
     """
-    sets 'type' on obj
-    sets a valid 'format' on obj if appropriate
-    uses data_format only if valid
+    If data_format is provided, it will be used unless invalidated for some reason. Swagger 2.0
+    allows any string as a format. If no data_format is provided, a default may be returned.
+    Returns None if no format should be set.
     """
     if data_type == 'array':
-        data_format = None
-
-    flatten_primitives = [
-        val for sublist in INTROSPECTOR_PRIMITIVES.values()
-        for val in sublist
-    ]
-
-    if data_format not in flatten_primitives:
-        formats = INTROSPECTOR_PRIMITIVES.get(data_type, None)
-        if formats:
-            data_format = formats[0]
-        else:
-            data_format = None
+        return None
+    if not data_format:
+        return next(iter(INTROSPECTOR_PRIMITIVES.get(data_type, [])), None)
     if data_format == data_type:
-        data_format = None
+        return None
+    return data_format
+
+
+def normalize_data_format(data_type, data_format, obj):
+    """
+    sets 'type' and 'format' on obj
+    """
+    data_format = get_normalized_data_format(data_type, data_format)
 
     obj['type'] = data_type
     if data_format is None and 'format' in obj:
