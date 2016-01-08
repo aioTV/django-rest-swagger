@@ -443,7 +443,7 @@ class DocumentationGenerator(object):
                 'type': 'type',
                 'format': 'format',
                 'description': 'description',
-                'defaultValue': 'default',
+                'default': 'default',
                 'minimum': 'minimum',
                 'maximum': 'maximum',
                 'enum': 'enum',
