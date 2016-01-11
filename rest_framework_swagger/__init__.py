@@ -1,4 +1,4 @@
-VERSION = '0.3.5-aio-v1'
+VERSION = '0.3.5-aio-v2'
 
 DEFAULT_SWAGGER_SETTINGS = {
     'exclude_namespaces': [],
