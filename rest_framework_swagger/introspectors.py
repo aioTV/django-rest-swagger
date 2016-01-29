@@ -159,9 +159,6 @@ class BaseMethodIntrospector(object):
 
         if hasattr(self.callback, 'get_serializer_class'):
             view = self.create_view()
-            parser = self.get_yaml_parser()
-            mock_view = parser.get_view_mocker(self.callback)
-            view = mock_view(view)
             if view is not None:
                 return view.get_serializer_class()
 
@@ -174,6 +171,11 @@ class BaseMethodIntrospector(object):
         view.request = HttpRequest()
         view.request.user = self.user
         view.request.method = self.method
+
+        parser = self.get_yaml_parser()
+        mock_view = parser.get_view_mocker(self.callback)
+        view = mock_view(view)
+
         return view
 
     def get_serializer_class(self):
@@ -871,7 +873,7 @@ class DjangoFilterIntrospector(object):
         qs = model.objects.none() if model else None
         self.filter_class = default_filter_class = self.filter_backend.default_filter_set
         if qs is not None:
-            self.filter_class = filter_backend().get_filter_class(self.callback, qs) or default_filter_class
+            self.filter_class = filter_backend().get_filter_class(self.parent.create_view(), qs) or default_filter_class
 
     def get_yaml(self):
         meta_spec =  getattr(getattr(self.filter_class, 'Meta', None), 'swagger_spec', '')
