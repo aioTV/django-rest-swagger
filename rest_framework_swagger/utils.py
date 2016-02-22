@@ -4,6 +4,7 @@ from collections import OrderedDict
 import rest_framework
 import inspect
 
+from django.utils import six
 from rest_framework.compat import apply_markdown
 from .constants import INTROSPECTOR_PRIMITIVES
 
@@ -134,3 +135,25 @@ def template_dict(root, find, replace):
     if isinstance(root, list):
         return [template_dict(v, find, replace) for v in root]
     return root
+
+
+def find_refs(root):
+    refs = set()
+    if hasattr(root, 'items'):
+        for key, value in root.items():
+            if key == '$ref' and value.startswith("#/definitions/"):
+                refs.add(value[len("#/definitions/"):])
+            else:
+                refs.update(find_refs(value))
+    elif hasattr(root, '__iter__') and not isinstance(root, six.string_types):
+        for value in root:
+            refs.update(find_refs(value))
+    return refs
+
+
+def find_used_refs(roots, definitions):
+    used_definitions = set(roots)
+    for root in roots:
+        extra_roots = find_refs(definitions[root]) - used_definitions
+        used_definitions.update(find_used_refs(extra_roots, definitions))
+    return used_definitions

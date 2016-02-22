@@ -17,7 +17,7 @@ from .introspectors import (
     extract_serializer_fields,
 )
 from .compat import OrderedDict
-from .utils import extract_base_path, get_serializer_name, template_dict
+from .utils import extract_base_path, get_serializer_name, template_dict, find_refs, find_used_refs
 
 
 class DocumentationGenerator(object):
@@ -42,7 +42,7 @@ class DocumentationGenerator(object):
             self.explicit_response_types.update({
                 self.default_payload_definition_name: self.default_payload_definition
             })
-        return OrderedDict([
+        root = OrderedDict([
             ('swagger', '2.0'),
             ('info', self.config.get('info', {
                 'contact': {},
@@ -58,6 +58,13 @@ class DocumentationGenerator(object):
             ('paths', self.get_paths(endpoints_conf)),
             ('definitions', self.get_definitions(endpoints_conf)),
         ])
+
+        # Remove unreferenced items..
+        used_refs = find_used_refs(find_refs(root['paths']), root['definitions'])
+        for unused_ref in set(root['definitions']) - used_refs:
+            del root['definitions'][unused_ref]
+
+        return root
 
     def get_paths(self, endpoints_conf):
         paths_dict = {}
@@ -325,9 +332,6 @@ class DocumentationGenerator(object):
         for endpoint in endpoints_conf:
             introspector = self.get_introspector(endpoint)
             for method_introspector in introspector:
-                if method_introspector.get_yaml_parser().should_omit_endpoint():
-                    continue
-
                 serializer = self._get_method_serializer(method_introspector)
                 if serializer is not None:
                     serializers.add(serializer)
