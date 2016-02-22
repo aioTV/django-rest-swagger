@@ -107,7 +107,7 @@ class DocumentationGenerator(object):
         operations = []
 
         for method_introspector in self.get_method_introspectors(api_endpoint, introspector):
-            doc_parser = method_introspector.get_yaml_parser()
+            doc_parser = method_introspector.yaml_parser
 
             if doc_parser.should_omit_endpoint():
                 continue
@@ -193,7 +193,7 @@ class DocumentationGenerator(object):
         }
 
     def _paginate_response_type(self, response_type, method_introspector):
-        doc_parser = method_introspector.get_yaml_parser()
+        doc_parser = method_introspector.yaml_parser
         definition_name = response_type + "Page"
 
         if response_type == "object":
@@ -224,7 +224,7 @@ class DocumentationGenerator(object):
                 parameters.append(introspector.build_body_parameters())
 
         parameters.extend(
-            introspector.get_yaml_parser().discover_parameters(inspector=introspector)
+            introspector.yaml_parser.discover_parameters(inspector=introspector)
         )
         return parameters
 
@@ -344,7 +344,7 @@ class DocumentationGenerator(object):
         Serializer might be ignored if explicitly told in docstring
         """
         serializer = method_inspector.get_response_serializer_class()
-        doc_parser = method_inspector.get_yaml_parser()
+        doc_parser = method_inspector.yaml_parser
 
         if doc_parser.get_response_type() is not None:
             # Custom response class detected

@@ -30,6 +30,10 @@ except ImportError:
 logger = logging.getLogger()
 
 
+PARAMS_PATTERN = re.compile(r' -- ')
+URL_PARAMS_PATTERN = re.compile('/{([^}]*)}')
+
+
 class IntrospectorHelper(object):
     __metaclass__ = ABCMeta
 
@@ -58,13 +62,12 @@ class IntrospectorHelper(object):
         Strips the params from the docstring (ie. myparam -- Some param) will
         not be removed from the text body
         """
-        params_pattern = re.compile(r' -- ')
         split_lines = trim_docstring(docstring).split('\n')
 
         cut_off = None
         for index, line in enumerate(split_lines):
             line = line.strip()
-            if params_pattern.search(line):
+            if PARAMS_PATTERN.search(line):
                 cut_off = index
                 break
         if cut_off is not None:
@@ -97,6 +100,13 @@ class BaseViewIntrospector(object):
         self.path = path
         self.pattern = pattern
         self.user = user
+        self._yaml_parser = None
+
+    @property
+    def yaml_parser(self):
+        if not self._yaml_parser:
+            self._yaml_parser = self.get_yaml_parser()
+        return self._yaml_parser
 
     def get_yaml_parser(self):
         parser = YAMLDocstringParser(self)
@@ -131,9 +141,16 @@ class BaseMethodIntrospector(object):
         self.callback = view_introspector.callback
         self.path = view_introspector.path
         self.user = view_introspector.user
+        self._yaml_parser = None
 
     def get_module(self):
         return self.callback.__module__
+
+    @property
+    def yaml_parser(self):
+        if not self._yaml_parser:
+            self._yaml_parser = self.get_yaml_parser()
+        return self._yaml_parser
 
     def get_yaml_parser(self):
         parser = YAMLDocstringParser(self)
@@ -146,7 +163,7 @@ class BaseMethodIntrospector(object):
         return parser
 
     def get_extra_serializer_classes(self):
-        return self.get_yaml_parser().get_extra_serializer_classes(
+        return self.yaml_parser.get_extra_serializer_classes(
             self.callback)
 
     def get_method_overrides(self):
@@ -172,29 +189,25 @@ class BaseMethodIntrospector(object):
         view.request.user = self.user
         view.request.method = self.method
 
-        parser = self.get_yaml_parser()
-        mock_view = parser.get_view_mocker(self.callback)
+        mock_view = self.yaml_parser.get_view_mocker(self.callback)
         view = mock_view(view)
 
         return view
 
     def get_serializer_class(self):
-        parser = self.get_yaml_parser()
-        serializer = parser.get_serializer_class(self.callback)
+        serializer = self.yaml_parser.get_serializer_class(self.callback)
         if serializer is None:
             serializer = self.ask_for_serializer_class()
         return serializer
 
     def get_response_serializer_class(self):
-        parser = self.get_yaml_parser()
-        serializer = parser.get_yaml_response_serializer_class(self.callback)
+        serializer = self.yaml_parser.get_yaml_response_serializer_class(self.callback)
         if serializer is None:
             serializer = self.get_serializer_class()
         return serializer
 
     def get_request_serializer_class(self):
-        parser = self.get_yaml_parser()
-        serializer = parser.get_yaml_request_serializer_class(self.callback)
+        serializer = self.yaml_parser.get_yaml_request_serializer_class(self.callback)
         if serializer is None:
             serializer = self.get_serializer_class()
         return serializer
@@ -210,8 +223,7 @@ class BaseMethodIntrospector(object):
         Returns the APIView's operationId. Defaults to generating an ID based on
         the method and path.
         """
-        parser = self.get_yaml_parser()
-        operation_id = parser.object.get('operationId', None)
+        operation_id = self.yaml_parser.object.get('operationId', None)
         if not operation_id:
             operation_id = self.method + "-" + self.path.strip("/").replace("/", "-")
 
@@ -251,7 +263,7 @@ class BaseMethodIntrospector(object):
                 method_docs
             )
 
-            if self.get_yaml_parser().get_param('replace_docs', False):
+            if self.yaml_parser.get_param('replace_docs', False):
                 docstring = method_docs
             else:
                 docstring += '\n' + method_docs
@@ -339,7 +351,7 @@ class BaseMethodIntrospector(object):
         """
         Gets the parameters from the URL
         """
-        url_params = re.findall('/{([^}]*)}', self.path)
+        url_params = URL_PARAMS_PATTERN.findall(self.path)
         params = []
 
         for param in url_params:
@@ -424,7 +436,7 @@ class BaseMethodIntrospector(object):
         params = []
 
         # Default to showing filter params only for 'list' operation, but allow overriding this
-        if self.method not in self.get_yaml_parser().get_param('filter_methods', ['list']):
+        if self.method not in self.yaml_parser.get_param('filter_methods', ['list']):
             return params
 
         for filter_backend in getattr(self.callback, 'filter_backends', []):
@@ -462,7 +474,7 @@ class BaseMethodIntrospector(object):
         params = []
 
         # Default to showing filter params only for 'list' operation, but allow overriding this
-        if self.method not in self.get_yaml_parser().get_param('filter_methods', ['list']):
+        if self.method not in self.yaml_parser.get_param('filter_methods', ['list']):
             return params
 
         serializer = self.get_serializer_class()
@@ -472,10 +484,8 @@ class BaseMethodIntrospector(object):
             if not issubclass(filter_backend, rest_framework.filters.DjangoFilterBackend):
                 continue
             filter_introspector = DjangoFilterIntrospector(filter_backend, self, model)
-            parser = self.get_yaml_parser()
-
-            parser.object = parser.load_obj_from_docstring(filter_introspector.get_yaml()) or {}
-            params.extend(parser.discover_parameters(filter_introspector))
+            self.yaml_parser.object = self.yaml_parser.load_obj_from_docstring(filter_introspector.get_yaml()) or {}
+            params.extend(self.yaml_parser.discover_parameters(filter_introspector))
 
         return params
 
