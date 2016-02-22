@@ -4,11 +4,13 @@ from collections import OrderedDict
 import rest_framework
 import inspect
 
+from django.utils import six
 from rest_framework.compat import apply_markdown
 from .constants import INTROSPECTOR_PRIMITIVES
 
 
-def get_serializer_name(serializer):
+def get_serializer_name(serializer, write=False):
+        prefix = "Write" if write else ""
         if serializer is None:
             return None
         if rest_framework.VERSION >= '3.0.0':
@@ -18,15 +20,15 @@ def get_serializer_name(serializer):
                 serializer = serializer.child
 
         if hasattr(serializer, 'Meta') and hasattr(serializer.Meta, 'swagger_name') and serializer.Meta.swagger_name:
-            return serializer.Meta.swagger_name
+            return prefix + serializer.Meta.swagger_name
 
         if not inspect.isclass(serializer):
             serializer = serializer.__class__
 
         if serializer.__name__.endswith("Serializer"):
-            return serializer.__name__[:-len("Serializer")]
+            return prefix + serializer.__name__[:-len("Serializer")]
 
-        return serializer.__name__
+        return prefix + serializer.__name__
 
 
 def get_view_description(view_cls, html=False, docstring=None):
@@ -133,3 +135,25 @@ def template_dict(root, find, replace):
     if isinstance(root, list):
         return [template_dict(v, find, replace) for v in root]
     return root
+
+
+def find_refs(root):
+    refs = set()
+    if hasattr(root, 'items'):
+        for key, value in root.items():
+            if key == '$ref' and value.startswith("#/definitions/"):
+                refs.add(value[len("#/definitions/"):])
+            else:
+                refs.update(find_refs(value))
+    elif hasattr(root, '__iter__') and not isinstance(root, six.string_types):
+        for value in root:
+            refs.update(find_refs(value))
+    return refs
+
+
+def find_used_refs(roots, definitions):
+    used_definitions = set(roots)
+    for root in roots:
+        extra_roots = find_refs(definitions[root]) - used_definitions
+        used_definitions.update(find_used_refs(extra_roots, definitions))
+    return used_definitions
