@@ -313,7 +313,7 @@ class BaseMethodIntrospector(object):
 
     def build_body_parameters(self):
         serializer = self.get_request_serializer_class()
-        serializer_name = get_serializer_name(serializer)
+        serializer_name = get_serializer_name(serializer, write=True)
 
         if serializer_name is None:
             return
@@ -776,7 +776,7 @@ class ViewSetMethodIntrospector(BaseMethodIntrospector):
         return parameters
 
 
-def extract_serializer_fields(serializer):
+def extract_serializer_fields(serializer, write=False):
     if serializer is None:
         return []
 
@@ -845,7 +845,7 @@ def extract_serializer_fields(serializer):
             if hasattr(field, 'is_documented') and not field.is_documented:
                 field_data['type'] = 'object'
             elif isinstance(field, rest_framework.serializers.BaseSerializer):
-                field_serializer = get_serializer_name(field)
+                field_serializer = get_serializer_name(field, write)
                 if getattr(field, 'write_only', False):
                     field_serializer = "Write{}".format(field_serializer)
                 if not has_many:

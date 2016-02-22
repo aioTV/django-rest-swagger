@@ -8,7 +8,8 @@ from rest_framework.compat import apply_markdown
 from .constants import INTROSPECTOR_PRIMITIVES
 
 
-def get_serializer_name(serializer):
+def get_serializer_name(serializer, write=False):
+        prefix = "Write" if write else ""
         if serializer is None:
             return None
         if rest_framework.VERSION >= '3.0.0':
@@ -18,15 +19,15 @@ def get_serializer_name(serializer):
                 serializer = serializer.child
 
         if hasattr(serializer, 'Meta') and hasattr(serializer.Meta, 'swagger_name') and serializer.Meta.swagger_name:
-            return serializer.Meta.swagger_name
+            return prefix + serializer.Meta.swagger_name
 
         if not inspect.isclass(serializer):
             serializer = serializer.__class__
 
         if serializer.__name__.endswith("Serializer"):
-            return serializer.__name__[:-len("Serializer")]
+            return prefix + serializer.__name__[:-len("Serializer")]
 
-        return serializer.__name__
+        return prefix + serializer.__name__
 
 
 def get_view_description(view_cls, html=False, docstring=None):

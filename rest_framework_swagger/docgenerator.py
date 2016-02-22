@@ -28,7 +28,7 @@ class DocumentationGenerator(object):
         self._tag_matchers = map(import_string, self.config.get('tag_matchers'))
         self._operation_filters = map(import_string, self.config.get('operation_filters', []))
         # Serializers defined in docstrings
-        self.explicit_serializers = set()
+        self.body_serializers = set()
         # Serializers defined in fields
         self.fields_serializers = set()
         # Response classes defined in docstrings
@@ -211,7 +211,7 @@ class DocumentationGenerator(object):
         """
         :param introspector: method introspector
         :return : if the serializer must be placed in the body, it will build
-        the body parameters and add the serializer to the explicit_serializers list
+        the body parameters and add the serializer to the body_serializers list
         else it will discover the parameters (from docstring and serializer)
         """
         serializer = introspector.get_request_serializer_class()
@@ -220,7 +220,7 @@ class DocumentationGenerator(object):
             if set(consumes).issubset({"multipart/form-data", "application/x-www-form-encoded"}):
                 parameters.extend(introspector.get_form_parameters())
             elif getattr(getattr(serializer, "Meta", None), "_in", "body") == "body":
-                self.explicit_serializers.add(serializer)
+                self.body_serializers.add(serializer)
                 parameters.append(introspector.build_body_parameters())
 
         parameters.extend(
@@ -260,43 +260,47 @@ class DocumentationGenerator(object):
         DRF serializers and their fields
         """
         serializers = self._get_serializer_set(endpoints_conf)
-        serializers.update(self.explicit_serializers)
-        serializers.update(
-            self._find_field_serializers(serializers)
-        )
+        serializers.update(self._find_field_serializers(serializers))
 
         models = {}
 
+        def add_serializer_tree(serializer, write):
+            serializer_name = get_serializer_name(serializer, write=write)
+            if serializer_name in models:
+                return
+
+            child_serializer = getattr(getattr(serializer, "Meta", None), "child", None)
+            if child_serializer:
+                add_serializer_tree(child_serializer, write)
+
+            models[serializer_name] = self.get_definition(serializer, write)
+
         for serializer in serializers:
-            serializer_name = get_serializer_name(serializer)
-
-            if hasattr(serializer, "Meta") and hasattr(serializer.Meta, "child"):
-                child_serializer = serializer.Meta.child
-                child_serializer_name = get_serializer_name(child_serializer)
-                models[child_serializer_name] = self.get_definition(child_serializer)
-
-            models[serializer_name] = self.get_definition(serializer)
+            add_serializer_tree(serializer, write=False)
+        for serializer in self.body_serializers:
+            add_serializer_tree(serializer, write=True)
 
         models.update(self.explicit_response_types)
         models.update(self.fields_serializers)
         return models
 
-    def get_definition(self, serializer):
+    def get_definition(self, serializer, write=False):
         """
         :param serializer: Serializer to describe
         :type serializer: serializer instance
         """
         data = self._get_serializer_fields(serializer)
         serializer_type = "object"
+        fields_to_skip = set(data['read_only'] if write else data['write_only'])
         properties = OrderedDict((k, v) for k, v in data['fields'].items()
-                                 if k not in data['write_only'])
+                                 if k not in fields_to_skip)
 
         if hasattr(serializer, "Meta") and hasattr(serializer.Meta, "child"):
             return {
                 'type': 'array',
                 'items': {
                     '$ref': '#/definitions/{}'.format(
-                        get_serializer_name(serializer.Meta.child)
+                        get_serializer_name(serializer.Meta.child, write=write)
                     )
                 }
             }
