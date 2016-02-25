@@ -51,7 +51,7 @@ class SwaggerUIView(BaseSwaggerView, View):
     def get_json_url(self, request):
         json_path = self.config.get("json_path", None)
         if not json_path:
-            json_path = self.config.get('base_path', request.path).rstrip("/") + "/swagger.json"
+            json_path = request.path.rstrip("/") + "/swagger.json"
         return request.build_absolute_uri(json_path)
 
 

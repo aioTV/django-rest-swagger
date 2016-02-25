@@ -52,17 +52,6 @@ def get_default_value(field):
     return default_value
 
 
-def extract_base_path(path, base_path):
-    """
-    extracts the base_path at the begining of the path
-    e.g:
-        extract_base_path(path="/foo/bar", base_path="/foo") => "/bar"
-    """
-    if path.startswith(base_path):
-        path = path[len(base_path):]
-    return path
-
-
 def do_markdown(docstring):
     # Markdown is optional
     if apply_markdown:
