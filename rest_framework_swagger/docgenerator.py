@@ -107,7 +107,7 @@ class DocumentationGenerator(object):
     def get_tags(self, url_path):
         tags = []
         for matcher in self._tag_matchers:
-            tags.extend(matcher(url_path))
+            tags.extend(matcher(url_path, self.config))
         return tags
 
     def get_operations(self, api_endpoint, introspector):
