@@ -177,8 +177,11 @@ class DocumentationGenerator(object):
             operation['responses'] = response_messages
             for filter_ in self._operation_filters:
                 filter_(operation, callback=method_introspector.callback, method=method_introspector.method)
+                if not operation:
+                    break
 
-            operations.append(operation)
+            if operation:
+                operations.append(operation)
 
         return operations
 
