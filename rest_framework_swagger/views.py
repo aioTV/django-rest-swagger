@@ -20,8 +20,10 @@ except IndexError:
 
 
 class BaseSwaggerView(object):
+    swagger_config_name = None
+
     def check_permission(self, request, swagger_config_name):
-        self.config = SwaggerConfig().get_config(swagger_config_name)
+        self.config = SwaggerConfig().get_config(swagger_config_name or self.swagger_config_name)
         if not self.has_permission(request):
             raise PermissionDenied()
 

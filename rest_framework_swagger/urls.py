@@ -2,26 +2,23 @@ from django.conf.urls import patterns
 from django.conf.urls import url
 from rest_framework_swagger.views import SwaggerUIView, Swagger2JSONView
 
+
+def swagger_views(config_name=None, path_prefix='^'):
+    return [
+        url(
+            path_prefix + r'swagger\.json$',
+            Swagger2JSONView.as_view(swagger_config_name=config_name),
+            name='django.swagger.2.0.json.view'
+        ),
+        url(
+            path_prefix + r'$',
+            SwaggerUIView.as_view(swagger_config_name=config_name),
+            name="django.swagger.base.view"
+        ),
+    ]
+
+
 urlpatterns = patterns(
     '',
-    url(
-        r'^(?P<swagger_config_name>[\w]+)/swagger\.json$',
-        Swagger2JSONView.as_view(),
-        name='django.swagger.2.0.json.view'
-    ),
-    url(
-        r'^swagger\.json$',
-        Swagger2JSONView.as_view(),
-        name='django.swagger.2.0.json.view'
-    ),
-    url(
-        r'^(?P<swagger_config_name>[\w]+)/?$',
-        SwaggerUIView.as_view(),
-        name="django.swagger.base.view"
-    ),
-    url(
-        r'^$',
-        SwaggerUIView.as_view(),
-        name="django.swagger.base.view"
-    )
+    *(swagger_views() + swagger_views(path_prefix=r'^(?P<swagger_config_name>[\w]+)/'))
 )
