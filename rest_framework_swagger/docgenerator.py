@@ -148,6 +148,7 @@ class DocumentationGenerator(object):
                 'tags': doc_parser.get_param(param_name='tags', default=self.get_tags(api_endpoint['path'])),
                 'parameters': self._get_operation_parameters(method_introspector, operation_method, consumes)
             }
+            operation.update(doc_parser.get_operation_extensions())
 
             if doc_parser.yaml_error is not None:
                 operation['notes'] += '<pre>YAMLError:\n {err}</pre>'.format(

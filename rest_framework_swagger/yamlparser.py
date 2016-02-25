@@ -525,3 +525,6 @@ class YAMLDocstringParser(object):
         :return : a single parameter found in the docstring
         """
         return self.object.get(param_name, default)
+
+    def get_operation_extensions(self):
+        return {k: v for k, v in self.object.items() if k.startswith("x-")}
