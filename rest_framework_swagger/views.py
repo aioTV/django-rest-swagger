@@ -43,6 +43,7 @@ class SwaggerUIView(BaseSwaggerView, View):
             'swagger_settings': {
                 'swagger_file': self.get_json_url(request),
                 'user_token': auth_token.key if auth_token else '',
+                'config': self.config,
             }
         }
         response = render_to_response(
