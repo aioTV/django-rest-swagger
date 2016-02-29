@@ -36,8 +36,8 @@ class DocumentationGenerator(object):
 
 
     def get_root(self, endpoints_conf):
-        self.default_payload_definition_name = self.config.get("default_payload_definition_name", None)
-        self.default_payload_definition = self.config.get("default_payload_definition", None)
+        self.default_payload_definition_name = self.config.get('default_payload_definition_name', None)
+        self.default_payload_definition = self.config.get('default_payload_definition', None)
         if self.default_payload_definition:
             self.explicit_response_types.update({
                 self.default_payload_definition_name: self.default_payload_definition
@@ -50,9 +50,9 @@ class DocumentationGenerator(object):
                 'version': self.request.version,
                 'description': '',
             })),
-            ('basePath', self.config.get("base_path", '')),
+            ('basePath', self.config.get('base_path', '')),
             ('host', self.config.get('host', self.request.get_host())),
-            ('schemes', self.config.get('schemes', ["https" if self.request.is_secure() else "http"])),
+            ('schemes', self.config.get('schemes', ['https' if self.request.is_secure() else 'http'])),
             ('securityDefinitions', self.config.get('securityDefinitions', {})),
             ('tags', self.config.get('tags', [])),
             ('paths', self.get_paths(endpoints_conf)),
@@ -102,7 +102,7 @@ class DocumentationGenerator(object):
     def get_method_introspectors(self, api_endpoint, introspector):
         return [method_introspector for method_introspector in introspector if
                 isinstance(method_introspector, BaseMethodIntrospector)
-                and not method_introspector.get_http_method() == "OPTIONS"]
+                and not method_introspector.get_http_method() == 'OPTIONS']
 
     def get_tags(self, url_path):
         tags = []
@@ -158,8 +158,8 @@ class DocumentationGenerator(object):
             # set default response reference
             if self.default_payload_definition:
                 response_messages['default'] = {
-                    "schema": {
-                        "$ref": "#/definitions/{}".format(self.default_payload_definition_name)
+                    'schema': {
+                        '$ref': '#/definitions/{}'.format(self.default_payload_definition_name)
                     }
                 }
 
@@ -186,7 +186,7 @@ class DocumentationGenerator(object):
         return operations
 
     def _get_default_response_object(self, operation_method, response_type):
-        if response_type == "object":
+        if response_type == 'object':
             schema = {'type': 'object'}
         else:
             schema = {'$ref': '#/definitions/' + response_type}
@@ -208,12 +208,12 @@ class DocumentationGenerator(object):
 
     def _paginate_response_type(self, response_type, method_introspector):
         doc_parser = method_introspector.yaml_parser
-        definition_name = response_type + "Page"
+        definition_name = response_type + 'Page'
 
-        if response_type == "object":
-            replacement = ("type", "object")
+        if response_type == 'object':
+            replacement = ('type', 'object')
         else:
-            replacement = ("$ref", "#/definitions/{}".format(response_type))
+            replacement = ('$ref', '#/definitions/{}'.format(response_type))
 
         page_definition = doc_parser.get_param('page_definition', self.config.get('default_page_definition'))
         page_definition = template_dict(page_definition, ('$ref', '#/definitions/*'), replacement)
@@ -231,9 +231,9 @@ class DocumentationGenerator(object):
         serializer = introspector.get_request_serializer_class()
         parameters = []
         if serializer:
-            if set(consumes).issubset({"multipart/form-data", "application/x-www-form-encoded"}):
+            if set(consumes).issubset({'multipart/form-data', 'application/x-www-form-encoded'}):
                 parameters.extend(introspector.get_form_parameters())
-            elif getattr(getattr(serializer, "Meta", None), "_in", "body") == "body":
+            elif getattr(getattr(serializer, 'Meta', None), '_in', 'body') == 'body':
                 self.body_serializers.add(serializer)
                 parameters.append(introspector.build_body_parameters())
 
@@ -283,7 +283,7 @@ class DocumentationGenerator(object):
             if serializer_name in models:
                 return
 
-            child_serializer = getattr(getattr(serializer, "Meta", None), "child", None)
+            child_serializer = getattr(getattr(serializer, 'Meta', None), 'child', None)
             if child_serializer:
                 add_serializer_tree(child_serializer, write)
 
@@ -317,7 +317,7 @@ class DocumentationGenerator(object):
             }
 
         data = self._get_serializer_fields(serializer)
-        serializer_type = "object"
+        serializer_type = 'object'
         fields_to_skip = set(data['read_only'] if write else data['write_only'])
         properties = OrderedDict((k, v) for k, v in data['fields'].items()
                                  if k not in fields_to_skip)
@@ -326,7 +326,7 @@ class DocumentationGenerator(object):
             'properties': properties,
             'type': serializer_type
         }
-        required_properties = [i for i in properties.keys() if i in data.get("required", [])]
+        required_properties = [i for i in properties.keys() if i in data.get('required', [])]
         if required_properties:
             definition['required'] = required_properties
 
@@ -390,13 +390,13 @@ class DocumentationGenerator(object):
             view_name = view_name.replace('ViewSet', '')
             view_name = view_name.replace('APIView', '')
             view_name = view_name.replace('View', '')
-            response_type_name = "{view}{method}Response".format(
+            response_type_name = '{view}{method}Response'.format(
                 view=view_name,
                 method=method_inspector.method.title().replace('_', '')
             )
             self.explicit_response_types.update({
                 response_type_name: {
-                    "id": response_type_name,
+                    'id': response_type_name,
                     "properties": response_type
                 }
             })
