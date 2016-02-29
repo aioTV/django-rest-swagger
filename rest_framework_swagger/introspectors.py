@@ -288,7 +288,7 @@ class BaseMethodIntrospector(object):
         if query_params:
             params += query_params
 
-        if pagination_params and self.get_http_method() == "GET":
+        if pagination_params:
             params += pagination_params
 
         return params
@@ -387,7 +387,7 @@ class BaseMethodIntrospector(object):
 
     def build_pagination_parameters(self):
         paginator = self.callback.pagination_class if hasattr(self.callback, 'pagination_class') else None
-        if paginator:
+        if paginator and self.yaml_parser.get_param('paginated', self.method == 'list'):
             page = paginator.page_query_param
             size = paginator.page_size_query_param
             if not page:
