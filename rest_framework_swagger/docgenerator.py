@@ -151,7 +151,7 @@ class DocumentationGenerator(object):
             operation.update(doc_parser.get_operation_extensions())
 
             if doc_parser.yaml_error is not None:
-                operation['notes'] += '<pre>YAMLError:\n {err}</pre>'.format(
+                operation['description'] += '\n\n<pre>YAMLError:\n {err}</pre>'.format(
                     err=doc_parser.yaml_error)
 
             response_messages = {}
