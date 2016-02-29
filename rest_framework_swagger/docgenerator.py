@@ -303,21 +303,24 @@ class DocumentationGenerator(object):
         :param serializer: Serializer to describe
         :type serializer: serializer instance
         """
+        child = getattr(getattr(serializer, 'Meta', None), 'child', None) or getattr(serializer, 'child', None)
+        if child and serializer.many:
+            child_name = get_serializer_name(child, write=write)
+            if child_name not in self.explicit_response_types:
+                self.explicit_response_types[child_name] = self.get_definition(child, write=write)
+
+            return {
+                'type': 'array',
+                'items': {
+                    '$ref': '#/definitions/{}'.format(child_name)
+                }
+            }
+
         data = self._get_serializer_fields(serializer)
         serializer_type = "object"
         fields_to_skip = set(data['read_only'] if write else data['write_only'])
         properties = OrderedDict((k, v) for k, v in data['fields'].items()
                                  if k not in fields_to_skip)
-
-        if hasattr(serializer, "Meta") and hasattr(serializer.Meta, "child"):
-            return {
-                'type': 'array',
-                'items': {
-                    '$ref': '#/definitions/{}'.format(
-                        get_serializer_name(serializer.Meta.child, write=write)
-                    )
-                }
-            }
 
         definition = {
             'properties': properties,
