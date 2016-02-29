@@ -208,7 +208,7 @@ class BaseMethodIntrospector(object):
 
     def get_request_serializer_class(self):
         serializer = self.yaml_parser.get_yaml_request_serializer_class(self.callback)
-        if serializer is None:
+        if serializer is None and self.get_http_method().lower() in {"post", "put", "patch"}:
             serializer = self.get_serializer_class()
         return serializer
 

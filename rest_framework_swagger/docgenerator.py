@@ -230,7 +230,7 @@ class DocumentationGenerator(object):
         """
         serializer = introspector.get_request_serializer_class()
         parameters = []
-        if method in ('POST', 'PUT', 'PATCH') and serializer:
+        if serializer:
             if set(consumes).issubset({"multipart/form-data", "application/x-www-form-encoded"}):
                 parameters.extend(introspector.get_form_parameters())
             elif getattr(getattr(serializer, "Meta", None), "_in", "body") == "body":
