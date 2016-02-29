@@ -17,7 +17,7 @@ from .introspectors import (
     extract_serializer_fields,
 )
 from .compat import OrderedDict
-from .utils import extract_base_path, get_serializer_name, template_dict, find_refs, find_used_refs
+from .utils import get_serializer_name, template_dict, find_refs, find_used_refs, get_child
 
 
 class DocumentationGenerator(object):
@@ -36,8 +36,8 @@ class DocumentationGenerator(object):
 
 
     def get_root(self, endpoints_conf):
-        self.default_payload_definition_name = self.config.get("default_payload_definition_name", None)
-        self.default_payload_definition = self.config.get("default_payload_definition", None)
+        self.default_payload_definition_name = self.config.get('default_payload_definition_name', None)
+        self.default_payload_definition = self.config.get('default_payload_definition', None)
         if self.default_payload_definition:
             self.explicit_response_types.update({
                 self.default_payload_definition_name: self.default_payload_definition
@@ -50,9 +50,9 @@ class DocumentationGenerator(object):
                 'version': self.request.version,
                 'description': '',
             })),
-            ('basePath', self.config.get("base_path", '')),
+            ('basePath', self.config.get('base_path', '')),
             ('host', self.config.get('host', self.request.get_host())),
-            ('schemes', self.config.get('schemes', ["https" if self.request.is_secure() else "http"])),
+            ('schemes', self.config.get('schemes', ['https' if self.request.is_secure() else 'http'])),
             ('securityDefinitions', self.config.get('securityDefinitions', {})),
             ('tags', self.config.get('tags', [])),
             ('paths', self.get_paths(endpoints_conf)),
@@ -68,9 +68,12 @@ class DocumentationGenerator(object):
 
     def get_paths(self, endpoints_conf):
         paths_dict = {}
+        base_path = self.config.get('base_path')
         for endpoint in endpoints_conf:
-            # remove the base_path from the begining of the path
-            endpoint['path'] = extract_base_path(path=endpoint['path'], base_path=self.config.get('base_path'))
+            # Can't have paths above the base path in the spec
+            if base_path and not endpoint['path'].startswith(base_path):
+                continue
+            endpoint['path'] = endpoint['path'][len(base_path):]
             path_item = self.get_path_item(endpoint)
             if path_item:
                 paths_dict[endpoint['path']] = path_item
@@ -99,12 +102,12 @@ class DocumentationGenerator(object):
     def get_method_introspectors(self, api_endpoint, introspector):
         return [method_introspector for method_introspector in introspector if
                 isinstance(method_introspector, BaseMethodIntrospector)
-                and not method_introspector.get_http_method() == "OPTIONS"]
+                and not method_introspector.get_http_method() == 'OPTIONS']
 
     def get_tags(self, url_path):
         tags = []
         for matcher in self._tag_matchers:
-            tags.extend(matcher(url_path))
+            tags.extend(matcher(url_path, self.config))
         return tags
 
     def get_operations(self, api_endpoint, introspector):
@@ -145,17 +148,18 @@ class DocumentationGenerator(object):
                 'tags': doc_parser.get_param(param_name='tags', default=self.get_tags(api_endpoint['path'])),
                 'parameters': self._get_operation_parameters(method_introspector, operation_method, consumes)
             }
+            operation.update(doc_parser.get_operation_extensions())
 
             if doc_parser.yaml_error is not None:
-                operation['notes'] += '<pre>YAMLError:\n {err}</pre>'.format(
+                operation['description'] += '\n\n<pre>YAMLError:\n {err}</pre>'.format(
                     err=doc_parser.yaml_error)
 
             response_messages = {}
             # set default response reference
             if self.default_payload_definition:
                 response_messages['default'] = {
-                    "schema": {
-                        "$ref": "#/definitions/{}".format(self.default_payload_definition_name)
+                    'schema': {
+                        '$ref': '#/definitions/{}'.format(self.default_payload_definition_name)
                     }
                 }
 
@@ -173,13 +177,16 @@ class DocumentationGenerator(object):
             operation['responses'] = response_messages
             for filter_ in self._operation_filters:
                 filter_(operation, callback=method_introspector.callback, method=method_introspector.method)
+                if not operation:
+                    break
 
-            operations.append(operation)
+            if operation:
+                operations.append(operation)
 
         return operations
 
     def _get_default_response_object(self, operation_method, response_type):
-        if response_type == "object":
+        if response_type == 'object':
             schema = {'type': 'object'}
         else:
             schema = {'$ref': '#/definitions/' + response_type}
@@ -201,12 +208,12 @@ class DocumentationGenerator(object):
 
     def _paginate_response_type(self, response_type, method_introspector):
         doc_parser = method_introspector.yaml_parser
-        definition_name = response_type + "Page"
+        definition_name = response_type + 'Page'
 
-        if response_type == "object":
-            replacement = ("type", "object")
+        if response_type == 'object':
+            replacement = ('type', 'object')
         else:
-            replacement = ("$ref", "#/definitions/{}".format(response_type))
+            replacement = ('$ref', '#/definitions/{}'.format(response_type))
 
         page_definition = doc_parser.get_param('page_definition', self.config.get('default_page_definition'))
         page_definition = template_dict(page_definition, ('$ref', '#/definitions/*'), replacement)
@@ -223,10 +230,10 @@ class DocumentationGenerator(object):
         """
         serializer = introspector.get_request_serializer_class()
         parameters = []
-        if method in ('POST', 'PUT', 'PATCH') and serializer:
-            if set(consumes).issubset({"multipart/form-data", "application/x-www-form-encoded"}):
+        if serializer:
+            if set(consumes).issubset({'multipart/form-data', 'application/x-www-form-encoded'}):
                 parameters.extend(introspector.get_form_parameters())
-            elif getattr(getattr(serializer, "Meta", None), "_in", "body") == "body":
+            elif getattr(getattr(serializer, 'Meta', None), '_in', 'body') == 'body':
                 self.body_serializers.add(serializer)
                 parameters.append(introspector.build_body_parameters())
 
@@ -276,7 +283,7 @@ class DocumentationGenerator(object):
             if serializer_name in models:
                 return
 
-            child_serializer = getattr(getattr(serializer, "Meta", None), "child", None)
+            child_serializer = get_child(serializer)
             if child_serializer:
                 add_serializer_tree(child_serializer, write)
 
@@ -296,27 +303,30 @@ class DocumentationGenerator(object):
         :param serializer: Serializer to describe
         :type serializer: serializer instance
         """
-        data = self._get_serializer_fields(serializer)
-        serializer_type = "object"
-        fields_to_skip = set(data['read_only'] if write else data['write_only'])
-        properties = OrderedDict((k, v) for k, v in data['fields'].items()
-                                 if k not in fields_to_skip)
+        child = get_child(serializer)
+        if child and serializer.many:
+            child_name = get_serializer_name(child, write=write)
+            if child_name not in self.explicit_response_types:
+                self.explicit_response_types[child_name] = self.get_definition(child, write=write)
 
-        if hasattr(serializer, "Meta") and hasattr(serializer.Meta, "child"):
             return {
                 'type': 'array',
                 'items': {
-                    '$ref': '#/definitions/{}'.format(
-                        get_serializer_name(serializer.Meta.child, write=write)
-                    )
+                    '$ref': '#/definitions/{}'.format(child_name)
                 }
             }
+
+        data = self._get_serializer_fields(serializer)
+        serializer_type = 'object'
+        fields_to_skip = set(data['read_only'] if write else data['write_only'])
+        properties = OrderedDict((k, v) for k, v in data['fields'].items()
+                                 if k not in fields_to_skip)
 
         definition = {
             'properties': properties,
             'type': serializer_type
         }
-        required_properties = [i for i in properties.keys() if i in data.get("required", [])]
+        required_properties = [i for i in properties.keys() if i in data.get('required', [])]
         if required_properties:
             definition['required'] = required_properties
 
@@ -380,14 +390,14 @@ class DocumentationGenerator(object):
             view_name = view_name.replace('ViewSet', '')
             view_name = view_name.replace('APIView', '')
             view_name = view_name.replace('View', '')
-            response_type_name = "{view}{method}Response".format(
+            response_type_name = '{view}{method}Response'.format(
                 view=view_name,
                 method=method_inspector.method.title().replace('_', '')
             )
             self.explicit_response_types.update({
                 response_type_name: {
-                    "id": response_type_name,
-                    "properties": response_type
+                    'id': response_type_name,
+                    'properties': response_type
                 }
             })
             return response_type_name

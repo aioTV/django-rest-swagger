@@ -6,6 +6,8 @@ import itertools
 import re
 import logging
 
+from django.utils import six
+
 from .compat import strip_tags, get_pagination_attribures
 from .yamlparser import YAMLDocstringParser
 from .constants import INTROSPECTOR_ENUMS, INTROSPECTOR_PRIMITIVES
@@ -152,13 +154,23 @@ class BaseMethodIntrospector(object):
             self._yaml_parser = self.get_yaml_parser()
         return self._yaml_parser
 
+    def _default_to_docs(self, object, key):
+        data = object.get(key, {})
+        if isinstance(data, six.string_types):
+            return {'docs': data}
+        return data
+
     def get_yaml_parser(self):
         parser = YAMLDocstringParser(self)
         parent_parser = YAMLDocstringParser(self.parent)
         new_object = {}
-        new_object.update(parent_parser.object.get("*", {}))
-        new_object.update(parent_parser.object.get(self.method, {}))
+
+        new_object.update(self._default_to_docs(parent_parser.object, "*"))
+        new_object.update(self._default_to_docs(parent_parser.object, self.method))
+
         new_object.update(parser.object)
+        new_object.update(self._default_to_docs(parser.object, self.get_http_method().lower()))
+
         parser.object = new_object
         return parser
 
@@ -208,15 +220,13 @@ class BaseMethodIntrospector(object):
 
     def get_request_serializer_class(self):
         serializer = self.yaml_parser.get_yaml_request_serializer_class(self.callback)
-        if serializer is None:
+        if serializer is None and self.get_http_method().lower() in {"post", "put", "patch"}:
             serializer = self.get_serializer_class()
         return serializer
 
     def get_summary(self):
         # If there is no docstring on the method, get class docs
-        return IntrospectorHelper.get_summary(
-            self.callback,
-            self.get_docs() or self.parent.get_description())
+        return IntrospectorHelper.get_summary(self.callback, self.get_description())
 
     def get_operation_id(self):
         """
@@ -239,37 +249,30 @@ class BaseMethodIntrospector(object):
             return []
         return {r.media_type for r in self.callback().get_renderers()}
 
+    def _clean_docs(self, docs):
+        docs = IntrospectorHelper.strip_yaml_from_docstring(docs)
+        docs = IntrospectorHelper.strip_params_from_docstring(docs)
+        return docs
+
     def get_description(self):
         """
         Returns the body of the docstring trimmed before any parameters are
         listed. First, get the class docstring and then get the method's. The
         methods will always inherit the class comments.
         """
-        docstring = ""
+        class_docs = self._clean_docs(get_view_description(self.callback))
+        method_docs = self._clean_docs(formatting.dedent(smart_text(self.get_docs())))
 
-        class_docs = get_view_description(self.callback)
-        class_docs = IntrospectorHelper.strip_yaml_from_docstring(class_docs)
-        class_docs = IntrospectorHelper.strip_params_from_docstring(class_docs)
-        method_docs = self.get_docs()
+        if self.yaml_parser.get_param('replace_docs', False):
+            docstring = method_docs
+        else:
+            docstring = "\n\n".join(filter(None, [class_docs, method_docs]))
 
-        if class_docs is not None:
-            docstring += class_docs + "  \n"
-        if method_docs is not None:
-            method_docs = formatting.dedent(smart_text(method_docs))
-            method_docs = IntrospectorHelper.strip_yaml_from_docstring(
-                method_docs
-            )
-            method_docs = IntrospectorHelper.strip_params_from_docstring(
-                method_docs
-            )
+        explicit_docs = self.yaml_parser.get_param("docs", None)
+        if explicit_docs is not None:
+            docstring = explicit_docs.format(super=docstring)
 
-            if self.yaml_parser.get_param('replace_docs', False):
-                docstring = method_docs
-            else:
-                docstring += '\n' + method_docs
-        docstring = docstring.strip()
-
-        return docstring
+        return docstring.strip()
 
     def get_parameters(self):
         """
@@ -288,7 +291,7 @@ class BaseMethodIntrospector(object):
         if query_params:
             params += query_params
 
-        if pagination_params and self.get_http_method() == "GET":
+        if pagination_params:
             params += pagination_params
 
         return params
@@ -387,7 +390,7 @@ class BaseMethodIntrospector(object):
 
     def build_pagination_parameters(self):
         paginator = self.callback.pagination_class if hasattr(self.callback, 'pagination_class') else None
-        if paginator:
+        if paginator and self.yaml_parser.get_param('paginated', self.method == 'list'):
             page = paginator.page_query_param
             size = paginator.page_size_query_param
             if not page:

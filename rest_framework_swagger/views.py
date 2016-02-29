@@ -20,8 +20,10 @@ except IndexError:
 
 
 class BaseSwaggerView(object):
+    swagger_config_name = None
+
     def check_permission(self, request, swagger_config_name):
-        self.config = SwaggerConfig().get_config(swagger_config_name)
+        self.config = SwaggerConfig().get_config(swagger_config_name or self.swagger_config_name)
         if not self.has_permission(request):
             raise PermissionDenied()
 
@@ -41,6 +43,7 @@ class SwaggerUIView(BaseSwaggerView, View):
             'swagger_settings': {
                 'swagger_file': self.get_json_url(request),
                 'user_token': auth_token.key if auth_token else '',
+                'config': self.config,
             }
         }
         response = render_to_response(
@@ -51,7 +54,7 @@ class SwaggerUIView(BaseSwaggerView, View):
     def get_json_url(self, request):
         json_path = self.config.get("json_path", None)
         if not json_path:
-            json_path = self.config.get('base_path', request.path).rstrip("/") + "/swagger.json"
+            json_path = request.path.rstrip("/") + "/swagger.json"
         return request.build_absolute_uri(json_path)
 
 
