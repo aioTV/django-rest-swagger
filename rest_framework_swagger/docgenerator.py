@@ -397,7 +397,7 @@ class DocumentationGenerator(object):
             self.explicit_response_types.update({
                 response_type_name: {
                     'id': response_type_name,
-                    "properties": response_type
+                    'properties': response_type
                 }
             })
             return response_type_name
