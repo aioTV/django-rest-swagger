@@ -17,7 +17,7 @@ from .introspectors import (
     extract_serializer_fields,
 )
 from .compat import OrderedDict
-from .utils import get_serializer_name, template_dict, find_refs, find_used_refs
+from .utils import get_serializer_name, template_dict, find_refs, find_used_refs, get_child
 
 
 class DocumentationGenerator(object):
@@ -283,7 +283,7 @@ class DocumentationGenerator(object):
             if serializer_name in models:
                 return
 
-            child_serializer = getattr(getattr(serializer, 'Meta', None), 'child', None)
+            child_serializer = get_child(serializer)
             if child_serializer:
                 add_serializer_tree(child_serializer, write)
 
@@ -303,7 +303,7 @@ class DocumentationGenerator(object):
         :param serializer: Serializer to describe
         :type serializer: serializer instance
         """
-        child = getattr(getattr(serializer, 'Meta', None), 'child', None) or getattr(serializer, 'child', None)
+        child = get_child(serializer)
         if child and serializer.many:
             child_name = get_serializer_name(child, write=write)
             if child_name not in self.explicit_response_types:

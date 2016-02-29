@@ -146,3 +146,14 @@ def find_used_refs(roots, definitions):
         extra_roots = find_refs(definitions[root]) - used_definitions
         used_definitions.update(find_used_refs(extra_roots, definitions))
     return used_definitions
+
+
+def get_child(parent_serializer):
+    """
+    Extract the child serializer from a parent serializer (e.g. ListSerializer).
+    """
+    # DRF handled this differently in older versions, so try both ways
+    meta = getattr(parent_serializer, 'Meta', None)
+    meta_child = getattr(meta, 'child', None)
+    serializer_child = getattr(parent_serializer, 'child', None)
+    return meta_child or serializer_child
