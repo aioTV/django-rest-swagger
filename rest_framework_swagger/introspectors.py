@@ -487,8 +487,8 @@ class BaseMethodIntrospector(object):
             if not issubclass(filter_backend, rest_framework.filters.DjangoFilterBackend):
                 continue
             filter_introspector = DjangoFilterIntrospector(filter_backend, self, model)
-            self.yaml_parser.object = self.yaml_parser.load_obj_from_docstring(filter_introspector.get_yaml()) or {}
-            params.extend(self.yaml_parser.discover_parameters(filter_introspector))
+            parser = YAMLDocstringParser(self, docstring=filter_introspector.get_yaml())
+            params.extend(parser.discover_parameters(filter_introspector))
 
         return params
 
@@ -733,8 +733,7 @@ class ViewSetIntrospector(BaseViewIntrospector):
 
 class ViewSetMethodIntrospector(BaseMethodIntrospector):
     def __init__(self, view_introspector, method, http_method):
-        super(ViewSetMethodIntrospector, self) \
-            .__init__(view_introspector, method)
+        super(ViewSetMethodIntrospector, self).__init__(view_introspector, method)
         self.http_method = http_method.upper()
 
     def get_http_method(self):

@@ -157,10 +157,11 @@ class YAMLDocstringParser(object):
     PARAM_TYPES = ['header', 'path', 'formData', 'body', 'query']
     yaml_error = None
 
-    def __init__(self, method_introspector):
+    def __init__(self, method_introspector, docstring=None):
         self.method_introspector = method_introspector
-        self.object = self.load_obj_from_docstring(
-            docstring=self.method_introspector.get_docs())
+        if docstring is None:
+            docstring = self.method_introspector.get_docs()
+        self.object = self.load_obj_from_docstring(docstring=docstring)
         if self.object is None:
             self.object = {}
 
