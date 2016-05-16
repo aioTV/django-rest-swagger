@@ -25,7 +25,7 @@ class DocumentationGenerator(object):
         self.config = config
         self.user = for_user or AnonymousUser()
         self.request = request
-        self._tag_matchers = map(import_string, self.config.get('tag_matchers'))
+        self._tag_matchers = list(map(import_string, self.config.get('tag_matchers')))
         self._operation_filters = map(import_string, self.config.get('operation_filters', []))
         # Serializers defined in docstrings
         self.body_serializers = set()
