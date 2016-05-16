@@ -513,7 +513,7 @@ def get_data_type(field):
     # elif isinstance(field, fields.SlugField):
         # return 'string', 'string', # 'slug'
     elif isinstance(field, fields.ChoiceField):
-        first_key = field.choices.keys()[0]
+        first_key = list(field.choices)[0]
         if isinstance(first_key, int):
             return 'integer', 'int64'
         return 'string', 'string'
@@ -587,7 +587,7 @@ class GenericViewIntrospector(BaseViewIntrospector):
     }
 
     def __iter__(self):
-        for http_method, action in self.methods().iteritems():
+        for http_method, action in self.methods().items():
             yield GenericViewMethodIntrospector(self, action, http_method)
 
     def _get_action_from_http_method(self, http_method):
