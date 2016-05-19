@@ -36,9 +36,7 @@ PARAMS_PATTERN = re.compile(r' -- ')
 URL_PARAMS_PATTERN = re.compile('/{([^}]*)}')
 
 
-class IntrospectorHelper(object):
-    __metaclass__ = ABCMeta
-
+class IntrospectorHelper(object, metaclass=ABCMeta):
     @staticmethod
     def strip_yaml_from_docstring(docstring):
         """
@@ -94,9 +92,7 @@ class IntrospectorHelper(object):
         return description
 
 
-class BaseViewIntrospector(object):
-    __metaclass__ = ABCMeta
-
+class BaseViewIntrospector(object, metaclass=ABCMeta):
     def __init__(self, callback, path, pattern, user):
         self.callback = callback
         self.path = path
@@ -131,9 +127,7 @@ class BaseViewIntrospector(object):
         return get_view_description(self.callback)
 
 
-class BaseMethodIntrospector(object):
-    __metaclass__ = ABCMeta
-
+class BaseMethodIntrospector(object, metaclass=ABCMeta):
     ENUMS = INTROSPECTOR_ENUMS
     PRIMITIVES = INTROSPECTOR_PRIMITIVES
 
@@ -266,7 +260,7 @@ class BaseMethodIntrospector(object):
         if self.yaml_parser.get_param('replace_docs', False):
             docstring = method_docs
         else:
-            docstring = "\n\n".join(filter(None, [class_docs, method_docs]))
+            docstring = "\n\n".join([_f for _f in [class_docs, method_docs] if _f])
 
         explicit_docs = self.yaml_parser.get_param("docs", None)
         if explicit_docs is not None:
@@ -427,7 +421,7 @@ class BaseMethodIntrospector(object):
         if valid_fields is None:
             return [
                 field.source or field_name
-                for field_name, field in serializer_class().fields.items()
+                for field_name, field in list(serializer_class().fields.items())
                 if not getattr(field, 'write_only', False)
             ]
         if valid_fields == '__all__':
@@ -557,7 +551,7 @@ def get_filter_data_type(filter_):
         fields.IntegerField: ('integer', 'int64'),
         fields.FloatField: ('integer', 'float'),
     }
-    for clazz, value in mapping.items():
+    for clazz, value in list(mapping.items()):
         if isinstance(filter_.field, clazz):
             return value
     return 'string', 'string'
@@ -587,7 +581,7 @@ class GenericViewIntrospector(BaseViewIntrospector):
     }
 
     def __iter__(self):
-        for http_method, action in self.methods().items():
+        for http_method, action in list(self.methods().items()):
             yield GenericViewMethodIntrospector(self, action, http_method)
 
     def _get_action_from_http_method(self, http_method):
@@ -705,7 +699,7 @@ class ViewSetIntrospector(BaseViewIntrospector):
         stuff = []
         for pattern in self.patterns:
             if pattern.callback:
-                stuff.extend(self._resolve_methods(pattern).values())
+                stuff.extend(list(self._resolve_methods(pattern).values()))
         return stuff
 
     def _resolve_methods(self, pattern=None):
@@ -788,7 +782,7 @@ def extract_serializer_fields(serializer, write=False):
         fields = serializer.get_fields()
 
     serializer_data = []
-    for name, field in fields.items():
+    for name, field in list(fields.items()):
         data_type, data_format = get_data_type(field) or ('string', 'string')
 
         if data_type == 'hidden':
@@ -833,7 +827,7 @@ def extract_serializer_fields(serializer, write=False):
             if isinstance(field.choices, list):
                 field_data['enum'] = [k for k, v in field.choices]
             elif isinstance(field.choices, dict):
-                field_data['enum'] = [k for k, v in field.choices.items()]
+                field_data['enum'] = [k for k, v in list(field.choices.items())]
 
         # Support for complex types
         if rest_framework.VERSION < '3.0.0':
@@ -900,7 +894,7 @@ class DjangoFilterIntrospector(object):
             return []
 
         params = []
-        for name, filter_ in self.filter_class.base_filters.items():
+        for name, filter_ in list(self.filter_class.base_filters.items()):
             data_type, data_format = get_filter_data_type(filter_)
             parameter = {
                 'in': 'query',
