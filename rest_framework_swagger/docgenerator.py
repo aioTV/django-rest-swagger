@@ -319,14 +319,14 @@ class DocumentationGenerator(object):
         data = self._get_serializer_fields(serializer)
         serializer_type = 'object'
         fields_to_skip = set(data['read_only'] if write else data['write_only'])
-        properties = OrderedDict((k, v) for k, v in list(data['fields'].items())
+        properties = OrderedDict((k, v) for k, v in data['fields'].items()
                                  if k not in fields_to_skip)
 
         definition = {
             'properties': properties,
             'type': serializer_type
         }
-        required_properties = [i for i in list(properties.keys()) if i in data.get('required', [])]
+        required_properties = [i for i in properties.keys() if i in data.get('required', [])]
         if required_properties:
             definition['required'] = required_properties
 
@@ -422,7 +422,7 @@ class DocumentationGenerator(object):
         serializers_set = set()
         for serializer in serializers:
             fields = serializer().get_fields()
-            for name, field in list(fields.items()):
+            for name, field in fields.items():
                 if isinstance(field, BaseSerializer):
                     serializers_set.add(get_thing(field, lambda f: f))
                     if field not in found_serializers:
@@ -468,7 +468,7 @@ class DocumentationGenerator(object):
                 '$ref': '$ref',
                 'items': 'items',
             }
-            for f_key, d_key in list(data_mapping.items()):
+            for f_key, d_key in data_mapping.items():
                 if field_data[d_key]:
                     f[f_key] = field_data[d_key]
 

@@ -120,7 +120,7 @@ def template_dict(root, find, replace):
     if hasattr(root, 'items'):
         return OrderedDict([
             replace if (k, v) == find else (k, template_dict(v, find, replace))
-            for k, v in list(root.items())
+            for k, v in root.items()
         ])
     if isinstance(root, list):
         return [template_dict(v, find, replace) for v in root]
@@ -130,7 +130,7 @@ def template_dict(root, find, replace):
 def find_refs(root):
     refs = set()
     if hasattr(root, 'items'):
-        for key, value in list(root.items()):
+        for key, value in root.items():
             if key == '$ref' and value.startswith("#/definitions/"):
                 refs.add(value[len("#/definitions/"):])
             else:
