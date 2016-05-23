@@ -258,15 +258,16 @@ class BaseMethodIntrospector(object, metaclass=ABCMeta):
         method_docs = self._clean_docs(formatting.dedent(smart_text(self.get_docs())))
 
         if self.yaml_parser.get_param('replace_docs', False):
-            docstring = method_docs
+            docstring_body = method_docs
         else:
-            docstring = "\n\n".join([_f for _f in [class_docs, method_docs] if _f])
+            docstring_body = "\n\n".join([docstring for docstring in
+                                          [class_docs, method_docs] if docstring])
 
         explicit_docs = self.yaml_parser.get_param("docs", None)
         if explicit_docs is not None:
-            docstring = explicit_docs.format(super=docstring)
+            docstring_body = explicit_docs.format(super=docstring_body)
 
-        return docstring.strip()
+        return docstring_body.strip()
 
     def get_parameters(self):
         """
