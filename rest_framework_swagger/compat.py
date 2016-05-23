@@ -9,7 +9,7 @@ else:
     OrderedDict = collections.OrderedDict
 
 if platform.python_version_tuple() < ('3', '0'):
-    from HTMLParser import HTMLParser
+    from html.parser import HTMLParser
 
     class MLStripper(HTMLParser):
         def __init__(self):

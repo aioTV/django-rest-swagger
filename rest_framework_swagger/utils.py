@@ -7,6 +7,7 @@ import inspect
 from django.utils import six
 from rest_framework.compat import apply_markdown
 from .constants import INTROSPECTOR_PRIMITIVES
+import collections
 
 
 def get_serializer_name(serializer, write=False):
@@ -47,7 +48,7 @@ def get_default_value(field):
         from rest_framework.fields import empty
         if default_value == empty:
             default_value = None
-    if callable(default_value):
+    if isinstance(default_value, collections.Callable):
         default_value = default_value()
     return default_value
 
@@ -119,7 +120,7 @@ def template_dict(root, find, replace):
     if hasattr(root, 'items'):
         return OrderedDict([
             replace if (k, v) == find else (k, template_dict(v, find, replace))
-            for k, v in root.items()
+            for k, v in list(root.items())
         ])
     if isinstance(root, list):
         return [template_dict(v, find, replace) for v in root]
@@ -129,7 +130,7 @@ def template_dict(root, find, replace):
 def find_refs(root):
     refs = set()
     if hasattr(root, 'items'):
-        for key, value in root.items():
+        for key, value in list(root.items()):
             if key == '$ref' and value.startswith("#/definitions/"):
                 refs.add(value[len("#/definitions/"):])
             else:
