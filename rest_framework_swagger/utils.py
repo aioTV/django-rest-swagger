@@ -158,3 +158,11 @@ def get_child(parent_serializer):
     meta_child = getattr(meta, 'child', None)
     serializer_child = getattr(parent_serializer, 'child', None)
     return meta_child or serializer_child
+
+
+def unique_items(items):
+    seen = set()
+    for item in items:
+        if item not in seen:
+            yield item
+            seen.add(item)

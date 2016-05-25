@@ -11,7 +11,7 @@ from django.utils import six
 from .compat import strip_tags, get_pagination_attribures
 from .yamlparser import YAMLDocstringParser
 from .constants import INTROSPECTOR_ENUMS, INTROSPECTOR_PRIMITIVES
-from .utils import (normalize_data_format, get_view_description,
+from .utils import (normalize_data_format, get_view_description, unique_items,
                     do_markdown, get_serializer_name, get_default_value, get_normalized_data_format)
 from abc import ABCMeta, abstractmethod
 
@@ -235,13 +235,13 @@ class BaseMethodIntrospector(object, metaclass=ABCMeta):
 
     def get_consumes(self):
         if not hasattr(self.callback, 'get_parsers'):
-            return []
-        return {r.media_type for r in self.callback().get_parsers()}
+            return consumes
+        return list(unique_items(r.media_type for r in self.callback().get_parsers()))
 
     def get_produces(self):
         if not hasattr(self.callback, 'get_renderers'):
             return []
-        return {r.media_type for r in self.callback().get_renderers()}
+        return list(unique_items(r.media_type for r in self.callback().get_renderers()))
 
     def _clean_docs(self, docs):
         docs = IntrospectorHelper.strip_yaml_from_docstring(docs)
