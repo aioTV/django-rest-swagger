@@ -11,7 +11,7 @@ from django.utils import six
 from .compat import strip_tags, get_pagination_attribures
 from .yamlparser import YAMLDocstringParser
 from .constants import INTROSPECTOR_ENUMS, INTROSPECTOR_PRIMITIVES
-from .utils import (normalize_data_format, get_view_description,
+from .utils import (normalize_data_format, get_view_description, unique_items,
                     do_markdown, get_serializer_name, get_default_value, get_normalized_data_format)
 from abc import ABCMeta, abstractmethod
 
@@ -235,13 +235,13 @@ class BaseMethodIntrospector(object, metaclass=ABCMeta):
 
     def get_consumes(self):
         if not hasattr(self.callback, 'get_parsers'):
-            return []
-        return {r.media_type for r in self.callback().get_parsers()}
+            return consumes
+        return list(unique_items(r.media_type for r in self.callback().get_parsers()))
 
     def get_produces(self):
         if not hasattr(self.callback, 'get_renderers'):
             return []
-        return {r.media_type for r in self.callback().get_renderers()}
+        return list(unique_items(r.media_type for r in self.callback().get_renderers()))
 
     def _clean_docs(self, docs):
         docs = IntrospectorHelper.strip_yaml_from_docstring(docs)
@@ -422,7 +422,7 @@ class BaseMethodIntrospector(object, metaclass=ABCMeta):
         if valid_fields is None:
             return [
                 field.source or field_name
-                for field_name, field in list(serializer_class().fields.items())
+                for field_name, field in serializer_class().fields.items()
                 if not getattr(field, 'write_only', False)
             ]
         if valid_fields == '__all__':
@@ -552,7 +552,7 @@ def get_filter_data_type(filter_):
         fields.IntegerField: ('integer', 'int64'),
         fields.FloatField: ('integer', 'float'),
     }
-    for clazz, value in list(mapping.items()):
+    for clazz, value in mapping.items():
         if isinstance(filter_.field, clazz):
             return value
     return 'string', 'string'
@@ -582,7 +582,7 @@ class GenericViewIntrospector(BaseViewIntrospector):
     }
 
     def __iter__(self):
-        for http_method, action in list(self.methods().items()):
+        for http_method, action in self.methods().items():
             yield GenericViewMethodIntrospector(self, action, http_method)
 
     def _get_action_from_http_method(self, http_method):
@@ -700,7 +700,7 @@ class ViewSetIntrospector(BaseViewIntrospector):
         stuff = []
         for pattern in self.patterns:
             if pattern.callback:
-                stuff.extend(list(self._resolve_methods(pattern).values()))
+                stuff.extend(self._resolve_methods(pattern).values())
         return stuff
 
     def _resolve_methods(self, pattern=None):
@@ -783,7 +783,7 @@ def extract_serializer_fields(serializer, write=False):
         fields = serializer.get_fields()
 
     serializer_data = []
-    for name, field in list(fields.items()):
+    for name, field in fields.items():
         data_type, data_format = get_data_type(field) or ('string', 'string')
 
         if data_type == 'hidden':
@@ -828,7 +828,7 @@ def extract_serializer_fields(serializer, write=False):
             if isinstance(field.choices, list):
                 field_data['enum'] = [k for k, v in field.choices]
             elif isinstance(field.choices, dict):
-                field_data['enum'] = [k for k, v in list(field.choices.items())]
+                field_data['enum'] = [k for k, v in field.choices.items()]
 
         # Support for complex types
         if rest_framework.VERSION < '3.0.0':
@@ -895,7 +895,7 @@ class DjangoFilterIntrospector(object):
             return []
 
         params = []
-        for name, filter_ in list(self.filter_class.base_filters.items()):
+        for name, filter_ in self.filter_class.base_filters.items():
             data_type, data_format = get_filter_data_type(filter_)
             parameter = {
                 'in': 'query',

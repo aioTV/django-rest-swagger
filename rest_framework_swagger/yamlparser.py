@@ -489,7 +489,7 @@ class YAMLDocstringParser(object):
         for item in itertools.chain(params1, params2):
             merged[item[key]] = item
 
-        return [val for (_, val) in list(merged.items())]
+        return [val for (_, val) in merged.items()]
 
     def get_parameters_strategy(self, param_type=None):
         """
@@ -528,4 +528,4 @@ class YAMLDocstringParser(object):
         return self.object.get(param_name, default)
 
     def get_operation_extensions(self):
-        return {k: v for k, v in list(self.object.items()) if k.startswith("x-")}
+        return {k: v for k, v in self.object.items() if k.startswith("x-")}

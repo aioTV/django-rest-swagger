@@ -1,4 +1,4 @@
-VERSION = '0.3.5+aiotv.7'
+VERSION = '0.3.5+aiotv.8'
 
 DEFAULT_SWAGGER_SETTINGS = {
     'exclude_namespaces': [],
@@ -23,7 +23,7 @@ try:
         global SWAGGER_SETTINGS
         SWAGGER_SETTINGS = provided_settings
 
-        for key, value in list(DEFAULT_SWAGGER_SETTINGS.items()):
+        for key, value in DEFAULT_SWAGGER_SETTINGS.items():
             if key not in SWAGGER_SETTINGS:
                 SWAGGER_SETTINGS[key] = value
 

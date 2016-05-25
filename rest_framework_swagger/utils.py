@@ -120,7 +120,7 @@ def template_dict(root, find, replace):
     if hasattr(root, 'items'):
         return OrderedDict([
             replace if (k, v) == find else (k, template_dict(v, find, replace))
-            for k, v in list(root.items())
+            for k, v in root.items()
         ])
     if isinstance(root, list):
         return [template_dict(v, find, replace) for v in root]
@@ -130,7 +130,7 @@ def template_dict(root, find, replace):
 def find_refs(root):
     refs = set()
     if hasattr(root, 'items'):
-        for key, value in list(root.items()):
+        for key, value in root.items():
             if key == '$ref' and value.startswith("#/definitions/"):
                 refs.add(value[len("#/definitions/"):])
             else:
@@ -158,3 +158,11 @@ def get_child(parent_serializer):
     meta_child = getattr(meta, 'child', None)
     serializer_child = getattr(parent_serializer, 'child', None)
     return meta_child or serializer_child
+
+
+def unique_items(items):
+    seen = set()
+    for item in items:
+        if item not in seen:
+            yield item
+            seen.add(item)
