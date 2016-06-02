@@ -139,6 +139,11 @@ class BaseMethodIntrospector(object, metaclass=ABCMeta):
         self.user = view_introspector.user
         self._yaml_parser = None
 
+    @property
+    def is_array_response(self):
+        """ Support definition of array responses with the 'many' attr """
+        return self.get_yaml_parser().object.get('many')
+
     def get_module(self):
         return self.callback.__module__
 
@@ -751,6 +756,12 @@ class ViewSetMethodIntrospector(BaseMethodIntrospector):
     def __init__(self, view_introspector, method, http_method):
         super(ViewSetMethodIntrospector, self).__init__(view_introspector, method)
         self.http_method = http_method.upper()
+
+    @property
+    def is_array_response(self):
+        """ ViewSet.list methods always return array responses """
+        return (self.method == 'list' or
+                super(ViewSetMethodIntrospector, self).is_array_response)
 
     def get_http_method(self):
         return self.http_method
