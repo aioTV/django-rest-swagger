@@ -532,6 +532,7 @@ def get_data_type(field):
     # elif isinstance(field, fields.SlugField):
         # return 'string', 'string', # 'slug'
     elif isinstance(field, fields.ChoiceField):
+        # extract_serializer_fields will see 'choice' and properly handle it as an enum type
         return 'choice', 'choice'
     # elif isinstance(field, fields.EmailField):
         # return 'string', 'string' #  'email'
