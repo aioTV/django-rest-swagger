@@ -9,6 +9,7 @@ class UrlParser(object):
 
     def __init__(self, config, request):
         self.urlconf = getattr(request, "urlconf", settings.ROOT_URLCONF)
+        self.exclude_url_names = config.get('exclude_url_names', [])
         self.exclude_namespaces = config.get('exclude_namespaces', [])
         self.exclude_module_paths = config.get('exclude_module_paths', [])
         self.include_module_paths = config.get('include_module_paths', [])
@@ -59,7 +60,7 @@ class UrlParser(object):
             if isinstance(pattern, RegexURLPattern):
                 endpoint_data = self.__assemble_endpoint_data__(pattern, prefix)
 
-                if endpoint_data is None:
+                if endpoint_data is None or pattern.name in self.exclude_url_names:
                     continue
 
                 if any(excluded in endpoint_data['path'] for excluded in self.exclude_url_patterns):

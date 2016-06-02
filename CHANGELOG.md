@@ -1,5 +1,20 @@
 ## Release Notes:
 
+
+### v0.3.6 (April 21, 2016)
+* merge fixes for ListField
+* exclude specific views (#421)
+* exclude urls and namespaces from resource-level (#428)
+* fix default settings in constructors
+
+### v0.3.5 (January 23, 2016)
+* fix django 1.9 deprecation warnings
+* allow arbitrary arguments to get methods of swagger classes 
+* respect django's CSRF_COOKIE_NAME setting
+* handle DRF's AcceptHeaderVersioning: send version in Accept header
+* fields.ListField introspects as 'array'
+* allow user to configure AnonymousUser class
+
 ### v0.3.4 (August 19, 2015)
 * prepare CurrentUserDefault better
 * fix throbber url

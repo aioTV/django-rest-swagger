@@ -1,6 +1,7 @@
-VERSION = '0.3.5+aiotv.9'
+VERSION = '0.3.6+aiotv.1'
 
 DEFAULT_SWAGGER_SETTINGS = {
+    'exclude_url_names': [],
     'exclude_namespaces': [],
     'api_version': '',
     'api_key': '',

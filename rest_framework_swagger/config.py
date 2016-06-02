@@ -5,6 +5,7 @@ from .constants import DEFAULT_PAGE_DEFINITION
 
 class SwaggerConfig(object):
     DEFAULT_SWAGGER_SETTINGS = {
+        'exclude_url_names': [],
         'exclude_namespaces': [],
         'exclude_module_paths': [],
         'exclude_url_patterns': [],
