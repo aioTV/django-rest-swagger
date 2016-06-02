@@ -6,6 +6,12 @@ import inspect
 
 from django.utils import six
 from rest_framework.compat import apply_markdown
+try:
+    from rest_framework.fields import CurrentUserDefault
+except ImportError:
+    # FIXME once we drop support of DRF 2.x .
+    CurrentUserDefault = None
+
 from .constants import INTROSPECTOR_PRIMITIVES
 import collections
 
@@ -49,6 +55,8 @@ def get_default_value(field):
         if default_value == empty:
             default_value = None
     if isinstance(default_value, collections.Callable):
+        if CurrentUserDefault is not None and isinstance(default_value, CurrentUserDefault):
+            default_value.user = None
         default_value = default_value()
     return default_value
 
