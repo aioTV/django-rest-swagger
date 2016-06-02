@@ -139,11 +139,6 @@ class BaseMethodIntrospector(object, metaclass=ABCMeta):
         self.user = view_introspector.user
         self._yaml_parser = None
 
-    @property
-    def is_array_response(self):
-        """ Support definition of array responses with the 'many' attr """
-        return self.get_yaml_parser().object.get('many')
-
     def get_module(self):
         return self.callback.__module__
 
@@ -188,12 +183,16 @@ class BaseMethodIntrospector(object, metaclass=ABCMeta):
         if hasattr(self.callback, 'get_serializer_class'):
             view = self.create_view()
             if view is not None:
-                if parser.should_omit_serializer():
+                if self.yaml_parser.should_omit_serializer():
                     return None
-                if "should either include a `serializer_class` attribute, or override the `get_serializer_class()` method." in str(e):  # noqa
-                    serializer_class = None
-                else:
-                    raise
+
+                try:
+                    serializer_class = view.get_serializer_class()
+                except AssertionError as e:
+                    if "should either include a `serializer_class` attribute, or override the `get_serializer_class()` method." in str(e):  # noqa
+                        serializer_class = None
+                    else:
+                        raise
                 return serializer_class
 
 
@@ -757,12 +756,6 @@ class ViewSetMethodIntrospector(BaseMethodIntrospector):
         super(ViewSetMethodIntrospector, self).__init__(view_introspector, method)
         self.http_method = http_method.upper()
 
-    @property
-    def is_array_response(self):
-        """ ViewSet.list methods always return array responses """
-        return (self.method == 'list' or
-                super(ViewSetMethodIntrospector, self).is_array_response)
-
     def get_http_method(self):
         return self.http_method
 
@@ -868,7 +861,7 @@ def extract_serializer_fields(serializer, write=False):
 
         # ENUM options
         if choices:
-            f['enum'] = choices
+            field_data['enum'] = choices
 
         # Support for complex types
         if rest_framework.VERSION < '3.0.0':

@@ -5,6 +5,7 @@ docs/swagger.png
 swag/
 *.py[cod]
 *.coverage
+.cache
 
 # C extensions
 *.so

@@ -100,7 +100,7 @@
                   log("Unable to Load SwaggerUI");
                 },
                 docExpansion: "none",
-				csrfCookieName: {{ django_settings.CSRF_COOKIE_NAME }},
+                csrfCookieName: {{ django_settings.CSRF_COOKIE_NAME }},
                 apisSorter: function (a, b) {
                     // Sort tags using the order specified in the tags list
                     if (typeof window.swaggerUi.api.swaggerObject.tags === 'undefined') {
@@ -142,7 +142,7 @@
                 $('#input_apiKey').val(apiKey);
                 $('#input_apiKey').change();
               }
-			  
+
               {# Add version to Accept header, if AcceptHeaderVersioning is used. #}
               {% if swagger_settings.api_version and rest_framework_settings.DEFAULT_VERSIONING_CLASS == 'rest_framework.versioning.AcceptHeaderVersioning' %}
                   window.authorizations.add('version', {
@@ -158,7 +158,7 @@
                           return true;
                       }
                   });
-			  {% endif %}
+              {% endif %}
 
               window.swaggerUi.load();
 

@@ -161,14 +161,6 @@ class DocumentationGenerator(object):
                 'parameters': self._get_operation_parameters(method_introspector, operation_method, consumes)
             }
 
-            # Check if this method has been reported as returning an
-            # array response
-            if method_introspector.is_array_response:
-                operation['items'] = {
-                    '$ref': operation['type']
-                }
-                operation['type'] = 'array'
-
             operation.update(doc_parser.get_operation_extensions())
 
             if doc_parser.yaml_error is not None:

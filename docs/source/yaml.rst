@@ -30,7 +30,6 @@ Example:
 
         serializer: .serializers.FooSerializer
         omit_serializer: false
-        many: true
 
         parameters_strategy: merge
         omit_parameters:
@@ -176,22 +175,6 @@ signature as follows:
       url:
         required: false
         type: url
-
-.. _many:
-
-many
-----
-
-In cases where an API response is a list of objects, it is possible to mark
-this to django-rest-swagger by overriding :code:`many` to `True`.
-
-.. code-block:: yaml
-
-    many: true
-
-This overrides the :code:`type` returned to be an array of the resolved API
-type. ViewSet :code:`list` methods do not require this definition, and are
-marked as :code:`many` automatically.
 
 
 responseMessages 

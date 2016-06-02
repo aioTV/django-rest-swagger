@@ -38,16 +38,3 @@ This function should use the following signature:
 
 -:code:`suffix` The string name of the class method which is providing the operation.
 
-
-Swagger 'list' views
---------------------
-
-django-rest-swagger introspects your views and viewset methods in order to determine the serializer used.
-
-In the majority of cases, the object returned is a single type. However, there are times where multiple serialized
-objects can be returned, such as in the case of `list` methods.
-
-When you use ViewSets, django-rest-swagger will report that the `list` method on a viewset returns a list of objects.
-
-For other ViewSet methods or function based views, you can also hint to django-rest-swagger that the view response is
-also a list, rather than a single object. See :ref:`many`

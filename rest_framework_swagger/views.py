@@ -1,5 +1,8 @@
+import json
+
 from django.conf import settings
 from django.views.generic import View
+from django.utils.safestring import mark_safe
 from django.shortcuts import render_to_response, RequestContext
 from django.core.exceptions import PermissionDenied
 from .config import SwaggerConfig
@@ -8,6 +11,7 @@ from rest_framework.views import Response, APIView
 from rest_framework.settings import api_settings
 from rest_framework.permissions import AllowAny
 
+import rest_framework_swagger as rfs
 from rest_framework_swagger.urlparser import UrlParser
 from rest_framework_swagger.docgenerator import DocumentationGenerator
 
