@@ -1,4 +1,4 @@
-VERSION = '0.3.5+aiotv.8'
+VERSION = '0.3.3+aiotv.1'
 
 DEFAULT_SWAGGER_SETTINGS = {
     'exclude_namespaces': [],
