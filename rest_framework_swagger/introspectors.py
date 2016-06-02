@@ -183,7 +183,18 @@ class BaseMethodIntrospector(object, metaclass=ABCMeta):
         if hasattr(self.callback, 'get_serializer_class'):
             view = self.create_view()
             if view is not None:
-                return view.get_serializer_class()
+                if self.yaml_parser.should_omit_serializer():
+                    return None
+
+                try:
+                    serializer_class = view.get_serializer_class()
+                except AssertionError as e:
+                    if "should either include a `serializer_class` attribute, or override the `get_serializer_class()` method." in str(e):  # noqa
+                        serializer_class = None
+                    else:
+                        raise
+                return serializer_class
+
 
     def create_view(self):
         view = self.callback()
@@ -488,6 +499,19 @@ class BaseMethodIntrospector(object, metaclass=ABCMeta):
         return params
 
 
+def get_primitive_type(var):
+    if isinstance(var, bool):
+        return 'boolean', 'boolean'
+    elif isinstance(var, int):
+        return 'integer', 'int64'
+    elif isinstance(var, float):
+        return 'number', 'float'
+    elif isinstance(var, six.string_types):
+        return 'string', 'string'
+    else:
+        return 'string', 'string'  # 'default'
+
+
 def get_data_type(field):
     # (in swagger 2.0 we might get to use the descriptive types..
     from rest_framework import fields
@@ -508,10 +532,8 @@ def get_data_type(field):
     # elif isinstance(field, fields.SlugField):
         # return 'string', 'string', # 'slug'
     elif isinstance(field, fields.ChoiceField):
-        first_key = list(field.choices)[0]
-        if isinstance(first_key, int):
-            return 'integer', 'int64'
-        return 'string', 'string'
+        # extract_serializer_fields will see 'choice' and properly handle it as an enum type
+        return 'choice', 'choice'
     # elif isinstance(field, fields.EmailField):
         # return 'string', 'string' #  'email'
     # elif isinstance(field, fields.RegexField):
@@ -536,9 +558,13 @@ def get_data_type(field):
         # return 'string', 'string'
     elif getattr(field, 'style', {}).get('input_type') == 'password':
         return 'string', 'password'
-
-    elif rest_framework.VERSION >= '3.0.0' and isinstance(field, fields.HiddenField):
-        return 'hidden', 'hidden'
+    elif rest_framework.VERSION >= '3.0.0':
+        if isinstance(field, fields.HiddenField):
+            return 'hidden', 'hidden'
+        elif isinstance(field, fields.ListField):
+            return 'array', 'array'
+        else:
+            return 'string', 'string'
     else:
         return 'string', 'string'
 
@@ -786,6 +812,17 @@ def extract_serializer_fields(serializer, write=False):
     for name, field in fields.items():
         data_type, data_format = get_data_type(field) or ('string', 'string')
 
+        choices = []
+        if data_type in BaseMethodIntrospector.ENUMS:
+            if isinstance(field.choices, list):
+                choices = [k for k, v in field.choices]
+            elif isinstance(field.choices, dict):
+                choices = [k for k, v in field.choices.items()]
+
+        if choices:
+            # guest data type and format
+            data_type, data_format = get_primitive_type(choices[0]) or ('string', 'string')
+
         if data_type == 'hidden':
             continue
 
@@ -824,11 +861,8 @@ def extract_serializer_fields(serializer, write=False):
             field_data['maximum'] = max_value
 
         # ENUM options
-        if data_type in BaseMethodIntrospector.ENUMS:
-            if isinstance(field.choices, list):
-                field_data['enum'] = [k for k, v in field.choices]
-            elif isinstance(field.choices, dict):
-                field_data['enum'] = [k for k, v in field.choices.items()]
+        if choices:
+            field_data['enum'] = choices
 
         # Support for complex types
         if rest_framework.VERSION < '3.0.0':

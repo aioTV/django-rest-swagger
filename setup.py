@@ -1,7 +1,25 @@
 import os
+import sys
+import shutil
 from setuptools import setup
 from rest_framework_swagger import VERSION
 
+if sys.argv[-1] == 'publish':
+    if os.system("pip freeze | grep wheel"):
+        print("wheel not installed.\nUse `pip install wheel`.\nExiting.")
+        sys.exit()
+    if os.system("pip freeze | grep twine"):
+        print("twine not installed.\nUse `pip install twine`.\nExiting.")
+        sys.exit()
+    os.system("python setup.py sdist bdist_wheel")
+    os.system("twine upload -r pypi dist/*")
+    print("You probably want to also tag the version now:")
+    print("  git tag -a %s -m 'version %s'" % (VERSION, VERSION))
+    print("  git push --tags")
+    shutil.rmtree('dist')
+    shutil.rmtree('build')
+    shutil.rmtree('django_rest_swagger.egg-info')
+    sys.exit()
 
 README = """
 Django REST Swagger
@@ -20,7 +38,7 @@ Docs @ http://django-rest-swagger.readthedocs.org/
 # allow setup.py to be run from any path
 os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 install_requires = [
-    'django>=1.5',
+    'Django>=1.5',
     'djangorestframework>=2.3.8',
     'PyYAML>=3.10',
 ]

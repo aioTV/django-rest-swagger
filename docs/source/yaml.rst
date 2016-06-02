@@ -50,6 +50,13 @@ Example:
         responseMessages:
             - code: 401
               message: Not authenticated
+
+        consumes:
+            - application/json
+            - application/xml
+        produces:
+            - application/json
+            - application/xml
         """
         ...
 
@@ -90,7 +97,7 @@ to populate :code:`type` you can specify it with :code:`pytype`:
     pytype: .serializers.FooSerializer
 
 Overriding parameters
---------------------
+---------------------
 
 parameters_strategy
 ~~~~~~~~~~~~~~~~~~~
@@ -169,6 +176,7 @@ signature as follows:
         required: false
         type: url
 
+
 responseMessages 
 ---------------------------------
 To document error codes that your APIView might throw
@@ -182,6 +190,20 @@ you can define them in :code:`responseMessages`:
         - code: 403
           message: Insufficient rights to call this procedure
 
+
+Media Types
+---------------------------------
+To document supported media types as input or output you can
+define them as :code:`consumes` and/or :code:`produces`, respectively
+
+.. code-block:: yaml
+
+    consumes:
+        - application/json
+        - application/xml
+    produces:
+        - application/json
+        - application/xml
 
 Different models for reading and writing operations
 ---------------------------------------------------

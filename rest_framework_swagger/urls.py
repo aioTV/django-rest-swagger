@@ -1,4 +1,3 @@
-from django.conf.urls import patterns
 from django.conf.urls import url
 from rest_framework_swagger.views import SwaggerUIView, Swagger2JSONView
 
@@ -18,7 +17,6 @@ def swagger_views(config_name=None, path_prefix='^'):
     ]
 
 
-urlpatterns = patterns(
-    '',
+urlpatterns = [
     *(swagger_views() + swagger_views(path_prefix=r'^(?P<swagger_config_name>[\w]+)/'))
-)
+]

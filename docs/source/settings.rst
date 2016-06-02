@@ -8,6 +8,7 @@ Example:
 .. code-block:: python
 
     SWAGGER_SETTINGS = {
+        'exclude_url_names': [],
         'exclude_namespaces': [],
         'api_version': '0.1',
         'api_path': '/',
@@ -21,6 +22,7 @@ Example:
         'api_key': '',
         'is_authenticated': False,
         'is_superuser': False,
+        'unauthenticated_user': 'django.contrib.auth.models.AnonymousUser',
         'permission_denied_handler': None,
         'resource_access_handler': None,
         'base_path':'helloreverb.com/docs',
@@ -84,6 +86,13 @@ The methods that can be interacted with in the UI
 
 Default: :code:`['get', 'post', 'put', 'patch', 'delete']`
 
+exclude_url_names
+------------------------
+
+list URL names to ignore
+
+Default: :code:`[]`
+
 exclude_namespaces
 ------------------------
 
@@ -110,6 +119,15 @@ is_superuser
 set to True to enforce admin only access
 
 Default: :code:`False`
+
+unauthenticated_user
+-------------------------
+
+Sets the class that is used for the user in unauthenticated requests.
+
+set to None to specify no user class
+
+Default: :code:`django.contrib.auth.models.AnonymousUser`
 
 permission_denied_handler
 -------------------------
