@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.views.generic import View
 from django.shortcuts import render_to_response, RequestContext
 from django.core.exceptions import PermissionDenied
@@ -42,8 +43,19 @@ class SwaggerUIView(BaseSwaggerView, View):
         data = {
             'swagger_settings': {
                 'swagger_file': self.get_json_url(request),
+                'api_version': rfs.SWAGGER_SETTINGS.get('api_version', ''),
                 'user_token': auth_token.key if auth_token else '',
                 'config': self.config,
+            },
+            'rest_framework_settings': {
+                'DEFAULT_VERSIONING_CLASS':
+                    settings.REST_FRAMEWORK.get('DEFAULT_VERSIONING_CLASS', '')
+                    if hasattr(settings, 'REST_FRAMEWORK') else None,
+
+            },
+            'django_settings': {
+                'CSRF_COOKIE_NAME': mark_safe(
+                    json.dumps(getattr(settings, 'CSRF_COOKIE_NAME', 'csrftoken'))),
             }
         }
         response = render_to_response(
@@ -62,7 +74,7 @@ class Swagger2JSONView(BaseSwaggerView, APIView):
     permission_classes = (AllowAny,)
     renderer_classes = (JSONRenderer, )
 
-    def get(self, request, version=None, swagger_config_name=None):
+    def get(self, request, *args, version=None, swagger_config_name=None, **kwargs):
         self.check_permission(request, swagger_config_name)
         paths = self.get_paths()
         generator = DocumentationGenerator(

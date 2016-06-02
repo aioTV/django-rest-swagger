@@ -1,5 +1,5 @@
 """Generates API documentation by introspection."""
-from django.contrib.auth.models import AnonymousUser
+import importlib
 from django.utils.module_loading import import_string
 import rest_framework
 
@@ -7,6 +7,7 @@ from rest_framework import viewsets, mixins
 from rest_framework.generics import GenericAPIView
 
 from rest_framework.serializers import BaseSerializer
+from rest_framework_swagger import SWAGGER_SETTINGS
 
 from .introspectors import (
     APIViewIntrospector,
@@ -23,7 +24,18 @@ from .utils import get_serializer_name, template_dict, find_refs, find_used_refs
 class DocumentationGenerator(object):
     def __init__(self, for_user=None, config=None, request=None):
         self.config = config
-        self.user = for_user or AnonymousUser()
+
+        # unauthenticated user is expected to be in the form 'module.submodule.Class' if a value is present
+        unauthenticated_user = SWAGGER_SETTINGS.get('unauthenticated_user')
+
+        # attempt to load unathenticated_user class from settings if a user is not supplied
+        if not for_user and unauthenticated_user:
+            module_name, class_name = unauthenticated_user.rsplit(".", 1)
+            unauthenticated_user_class = getattr(importlib.import_module(module_name), class_name)
+            for_user = unauthenticated_user_class()
+
+        self.user = for_user
+
         self.request = request
         self._tag_matchers = list(map(import_string, self.config.get('tag_matchers')))
         self._operation_filters = list(map(import_string, self.config.get('operation_filters', [])))
@@ -361,7 +373,6 @@ class DocumentationGenerator(object):
 
         Serializer might be ignored if explicitly told in docstring
         """
-        serializer = method_inspector.get_response_serializer_class()
         doc_parser = method_inspector.yaml_parser
 
         if doc_parser.get_response_type() is not None:
@@ -369,8 +380,9 @@ class DocumentationGenerator(object):
             return None
 
         if doc_parser.should_omit_serializer():
-            serializer = None
+            return None
 
+        serializer = method_inspector.get_response_serializer_class()
         return serializer
 
     def _get_method_response_type(self, doc_parser, serializer,

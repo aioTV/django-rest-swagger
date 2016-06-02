@@ -183,7 +183,14 @@ class BaseMethodIntrospector(object, metaclass=ABCMeta):
         if hasattr(self.callback, 'get_serializer_class'):
             view = self.create_view()
             if view is not None:
-                return view.get_serializer_class()
+                if parser.should_omit_serializer():
+                    return None
+                if "should either include a `serializer_class` attribute, or override the `get_serializer_class()` method." in str(e):  # noqa
+                    serializer_class = None
+                else:
+                    raise
+                return serializer_class
+
 
     def create_view(self):
         view = self.callback()
@@ -536,9 +543,13 @@ def get_data_type(field):
         # return 'string', 'string'
     elif getattr(field, 'style', {}).get('input_type') == 'password':
         return 'string', 'password'
-
-    elif rest_framework.VERSION >= '3.0.0' and isinstance(field, fields.HiddenField):
-        return 'hidden', 'hidden'
+    elif rest_framework.VERSION >= '3.0.0':
+        if isinstance(field, fields.HiddenField):
+            return 'hidden', 'hidden'
+        elif isinstance(field, fields.ListField):
+            return 'array', 'array'
+        else:
+            return 'string', 'string'
     else:
         return 'string', 'string'
 
