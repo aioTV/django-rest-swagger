@@ -3,7 +3,8 @@ import json
 from django.conf import settings
 from django.views.generic import View
 from django.utils.safestring import mark_safe
-from django.shortcuts import render_to_response, RequestContext
+from django.shortcuts import render_to_response
+from django.template import RequestContext
 from django.core.exceptions import PermissionDenied
 from .config import SwaggerConfig
 
