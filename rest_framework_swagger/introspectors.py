@@ -881,8 +881,6 @@ def extract_serializer_fields(serializer, write=False):
                     field_serializer = "Write{}".format(field_serializer)
                 if not has_many:
                     field_data['$ref'] = '#/definitions/' + field_serializer
-            else:
-                data_type = 'string'
 
             if has_many:
                 field_data['type'] = 'array'
